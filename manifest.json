@@ -1,11 +1,10 @@
-
 {
   "name": "OSM Service Intern",
   "short_name": "OSM Intern",
   "id": "com.osm.service.intern",
   "description": "Intelligent technical assistant for OSM service interns to troubleshoot vehicle issues in the field.",
-  "start_url": "./index.html",
-  "scope": "./",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#16a34a",
