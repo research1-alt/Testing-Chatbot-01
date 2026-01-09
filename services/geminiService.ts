@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type, Part } from "@google/genai";
 import { relayBaseImageData } from "../utils/assets";
 
@@ -22,27 +21,18 @@ const languageMap: { [key: string]: string } = {
     'ur-IN': 'Urdu'
 };
 
-/**
- * Helper to clean JSON strings from Gemini responses.
- * Sometimes models wrap output in markdown code blocks even when told not to.
- */
 function cleanJsonResponse(text: string): string {
     return text.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
 }
 
-/**
- * Generates a technical diagram using Gemini 2.5 Flash Image.
- * Highly optimized for OSM Relay diagrams.
- */
 export async function generateImage(prompt: string): Promise<string | null> {
     const apiKey = process.env.API_KEY;
-    if (!apiKey) return null;
+    if (!apiKey || apiKey === "") return null;
 
     try {
         const ai = new GoogleGenAI({ apiKey });
         
         let parts: Part[] = [];
-        // Specialized logic for relay diagrams to maintain technical precision
         if (/relay/i.test(prompt) && relayBaseImageData) {
             parts.push({
                 inlineData: {
@@ -86,8 +76,8 @@ export async function getChatbotResponse(
 ): Promise<{ answer: string, suggestions: string[], isUnclear: boolean, imageUrl?: string }> {
   const apiKey = process.env.API_KEY;
   
-  if (!apiKey) {
-      throw new Error("API Key configuration missing. Please set the API_KEY environment variable in Vercel.");
+  if (!apiKey || apiKey === "") {
+      throw new Error("API Key is missing or empty in the production build. Please check your Vercel Environment Variables for 'API_KEY' and trigger a 'Redeploy' with 'Clear Cache'.");
   }
 
   try {
@@ -117,7 +107,7 @@ export async function getChatbotResponse(
     const fullPrompt = `KNOWLEDGE BASE:\n${fileContent}\n\nCHAT HISTORY:\n${chatHistory}\n\nUSER QUERY: "${query}"`;
   
     const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview", // Switched to Flash for better RAG stability and speed
+        model: "gemini-3-flash-preview",
         contents: fullPrompt,
         config: {
             systemInstruction,
@@ -159,7 +149,7 @@ export async function generateVideo(
     aspectRatio: '16:9' | '9:16'
 ): Promise<{ videoUrl: string, error?: string }> {
     const apiKey = process.env.API_KEY;
-    if (!apiKey) return { videoUrl: '', error: 'API Key missing' };
+    if (!apiKey || apiKey === "") return { videoUrl: '', error: 'API Key missing' };
 
     try {
         const ai = new GoogleGenAI({ apiKey });
