@@ -21,7 +21,7 @@ const supportedLanguages = [
     { code: 'gu-IN', name: 'ગુજરાતી (Gujarati)' },
     { code: 'kn-IN', name: 'ಕನ್ನಡ (Kannada)' },
     { code: 'ml-IN', name: 'മലയാളം (Malayalam)' },
-    { code: 'mr-IN', name: 'मराठी (Marathi)' },
+    { code: 'mr-IN', name: 'मરાઠી (Marathi)' },
     { code: 'ta-IN', name: 'தமிழ் (Tamil)' },
     { code: 'te-IN', name: 'తెలుగు (Telugu)' },
     { code: 'ur-IN', name: 'اردو (Urdu)' },
@@ -147,6 +147,13 @@ const App: React.FC = () => {
       }
   };
 
+  const handleReloadApp = () => { 
+    if (window.confirm("Clear chat history and restart?")) { 
+      localStorage.removeItem('app-messages'); 
+      window.location.reload(); 
+    } 
+  };
+
   const isAdmin = user?.email === 'research1@omegaseikimobility.com';
 
   if (!user) return view === 'auth' ? <AuthPage onLogin={login} onSignup={signup} error={authError} isLoading={isAuthLoading} /> : <IntroPage onStart={() => setView('auth')} />;
@@ -171,6 +178,10 @@ const App: React.FC = () => {
                 </div>
                 
                 <div className="flex items-center gap-2">
+                    <button onClick={handleReloadApp} className="p-2.5 rounded-xl bg-gray-50 hover:bg-red-50 text-gray-600 hover:text-red-600 transition-all border border-gray-100" title="Reset Chat">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    </button>
+
                     {isAdmin && (
                         <button onClick={() => setIsAdminPanelOpen(true)} className="p-2.5 rounded-xl bg-gray-50 hover:bg-green-50 text-gray-600 hover:text-green-600 transition-all border border-gray-100" title="Knowledge Base">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
@@ -189,11 +200,11 @@ const App: React.FC = () => {
                                     <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Language</h3>
                                     <select value={selectedLanguage} onChange={(e) => setSelectedLanguage(e.target.value as LanguageCode)} className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none bg-gray-50 font-medium">{supportedLanguages.map(lang => <option key={lang.code} value={lang.code}>{lang.name}</option>)}</select>
                                 </div>
-                                <button onClick={handleReloadApp} className="w-full text-left p-3 rounded-xl hover:bg-gray-50 text-gray-700 font-bold flex items-center gap-3 transition-colors">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                    <span>Reset Chat</span>
-                                </button>
-                                <button onClick={logout} className="w-full text-left p-3 rounded-xl hover:bg-red-50 text-red-600 font-bold flex items-center gap-3 transition-colors mt-2">
+                                <a href="https://forms.gle/YcrerYAazwxi5zXL7" target="_blank" rel="noopener noreferrer" className="w-full text-left p-3 rounded-xl hover:bg-blue-50 text-blue-600 font-bold flex items-center gap-3 transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
+                                    <span>Feedback</span>
+                                </a>
+                                <button onClick={logout} className="w-full text-left p-3 rounded-xl hover:bg-red-50 text-red-600 font-bold flex items-center gap-3 transition-colors">
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" /></svg>
                                     <span>Logout</span>
                                 </button>
@@ -258,8 +269,6 @@ const App: React.FC = () => {
         <VideoGeneratorModal isOpen={isVideoModalOpen} onClose={() => setIsVideoModalOpen(false)} onSubmit={handleVideoSubmit} isGenerating={isGeneratingVideo} generationError={videoError} resetGenerationError={() => setVideoError(null)} />
     </div>
   );
-
-  function handleReloadApp() { if (window.confirm("Clear chat history and restart?")) { localStorage.removeItem('app-messages'); window.location.reload(); } }
 };
 
 export default App;
