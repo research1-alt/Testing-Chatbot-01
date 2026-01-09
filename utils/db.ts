@@ -1,9 +1,10 @@
+
 // A simple IndexedDB wrapper to provide a persistent, client-side "database" for knowledge base files and feedback.
 
 const DB_NAME = 'OSMServiceInternDB';
 const STORE_NAME = 'files';
 const FEEDBACK_STORE = 'feedback';
-const DB_VERSION = 2; // Incremented version to support new store
+const DB_VERSION = 2;
 
 export interface StoredFile {
     name: string;
@@ -43,6 +44,17 @@ export const addFile = async (file: StoredFile): Promise<void> => {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
     store.put(file);
+    return new Promise((resolve, reject) => {
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+    });
+};
+
+export const deleteFile = async (name: string): Promise<void> => {
+    const db = await openDB();
+    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    store.delete(name);
     return new Promise((resolve, reject) => {
         transaction.oncomplete = () => resolve();
         transaction.onerror = () => reject(transaction.error);

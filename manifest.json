@@ -4,20 +4,19 @@
   "short_name": "OSM Intern",
   "id": "com.osm.service.intern",
   "description": "Intelligent technical assistant for OSM service interns to troubleshoot vehicle issues in the field.",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#16a34a",
   "orientation": "portrait",
-  "categories": ["business", "productivity", "utilities"],
+  "categories": [
+    "business",
+    "productivity",
+    "utilities"
+  ],
   "prefer_related_applications": false,
   "icons": [
-    {
-      "src": "https://cdn-icons-png.flaticon.com/128/3858/3858712.png",
-      "sizes": "128x128",
-      "type": "image/png"
-    },
     {
       "src": "https://cdn-icons-png.flaticon.com/512/3858/3858712.png",
       "sizes": "192x192",
@@ -39,18 +38,18 @@
   ],
   "screenshots": [
     {
-      "src": "https://placehold.co/1280x720/16a34a/white/png?text=OSM+Service+Intern+Wide",
+      "src": "https://raw.githubusercontent.com/GoogleChromeLabs/pwacompat/master/test/pwa/icon.png",
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Technical Assistant Desktop View"
+      "label": "OSM Service Intern Desktop"
     },
     {
-      "src": "https://placehold.co/720x1280/16a34a/white/png?text=OSM+Service+Intern+Mobile",
+      "src": "https://raw.githubusercontent.com/GoogleChromeLabs/pwacompat/master/test/pwa/icon.png",
       "sizes": "720x1280",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Technical Assistant Mobile View"
+      "label": "OSM Service Intern Mobile"
     }
   ]
 }
