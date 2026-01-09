@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, Part } from "@google/genai";
 import { relayBaseImageData } from "../utils/assets";
 
@@ -22,12 +23,23 @@ const languageMap: { [key: string]: string } = {
 };
 
 /**
+ * Helper to clean JSON strings from Gemini responses.
+ * Sometimes models wrap output in markdown code blocks even when told not to.
+ */
+function cleanJsonResponse(text: string): string {
+    return text.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
+}
+
+/**
  * Generates a technical diagram using Gemini 2.5 Flash Image.
  * Highly optimized for OSM Relay diagrams.
  */
 export async function generateImage(prompt: string): Promise<string | null> {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) return null;
+
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey });
         
         let parts: Part[] = [];
         // Specialized logic for relay diagrams to maintain technical precision
@@ -72,8 +84,14 @@ export async function getChatbotResponse(
     chatHistory: string,
     language: string,
 ): Promise<{ answer: string, suggestions: string[], isUnclear: boolean, imageUrl?: string }> {
+  const apiKey = process.env.API_KEY;
+  
+  if (!apiKey) {
+      throw new Error("API Key configuration missing. Please set the API_KEY environment variable in Vercel.");
+  }
+
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey });
     
     if (!fileContent) {
         return { 
@@ -89,17 +107,17 @@ export async function getChatbotResponse(
     
     TASKS:
     1. If a user asks for a diagram (e.g., "show me the DC Output relay"), generate a 'diagramQuery' containing the EXACT pins, wire colors, and connections from the document.
-    2. Explain the working logic of the component requested.
-    3. If the query is about the vehicle not starting, check the "Start Sequence" and "Odometer Saving" notes.
+    2. Explain the working logic of the component requested based ONLY on the provided manual.
+    3. If the query is about the vehicle not starting, check the "Start Sequence" and "Odometer Saving" sections.
     
     FORMAT:
-    - Respond strictly in JSON.
+    - Respond strictly in JSON format.
     - visible text (answer, suggestions) must be in ${languageName}.`;
 
     const fullPrompt = `KNOWLEDGE BASE:\n${fileContent}\n\nCHAT HISTORY:\n${chatHistory}\n\nUSER QUERY: "${query}"`;
   
     const response = await ai.models.generateContent({
-        model: "gemini-3-pro-preview",
+        model: "gemini-3-flash-preview", // Switched to Flash for better RAG stability and speed
         contents: fullPrompt,
         config: {
             systemInstruction,
@@ -117,7 +135,8 @@ export async function getChatbotResponse(
         },
     });
 
-    const data = JSON.parse(response.text || "{}") as GeminiResponse;
+    const cleanedText = cleanJsonResponse(response.text || "{}");
+    const data = JSON.parse(cleanedText) as GeminiResponse;
     let imageUrl: string | undefined;
 
     if (data.diagramQuery) {
@@ -125,9 +144,11 @@ export async function getChatbotResponse(
     }
 
     return { ...data, imageUrl };
-  } catch (error) {
-    console.error("Gemini Error:", error);
-    throw new Error("I'm having trouble with the technical manual analysis.");
+  } catch (error: any) {
+    console.error("Gemini API Error Detail:", error);
+    if (error.message?.includes('429')) throw new Error("The AI is currently busy (Rate Limit). Please try again in a few seconds.");
+    if (error.message?.includes('API_KEY')) throw new Error("Invalid API Key. Please check your Vercel settings.");
+    throw new Error(`Technical Analysis Failed: ${error.message || 'Unknown error'}`);
   }
 }
 
@@ -137,8 +158,11 @@ export async function generateVideo(
     prompt: string,
     aspectRatio: '16:9' | '9:16'
 ): Promise<{ videoUrl: string, error?: string }> {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) return { videoUrl: '', error: 'API Key missing' };
+
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey });
         let operation = await ai.models.generateVideos({
             model: 'veo-3.1-fast-generate-preview',
             prompt: prompt,
@@ -153,7 +177,7 @@ export async function generateVideo(
 
         const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
         if (downloadLink) {
-            const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+            const response = await fetch(`${downloadLink}&key=${apiKey}`);
             const blob = await response.blob();
             return { videoUrl: URL.createObjectURL(blob) };
         }
