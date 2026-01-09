@@ -1,49 +1,43 @@
 
-const CACHE_NAME = 'osm-intern-v1';
-const ASSETS = [
-  '/',
-  '/index.html',
-  '/index.css',
-  '/manifest.json'
-];
+const CACHE_NAME = 'osm-cache-v2';
+const OFFLINE_URL = '/index.html';
 
-// Install event - caching basic assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
+      return cache.addAll(['/', '/index.html', '/index.css', '/manifest.json']);
     })
   );
   self.skipWaiting();
 });
 
-// Activate event
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
+    caches.keys().then((cacheNames) => {
       return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
+        })
       );
     })
   );
-  return self.clients.claim();
+  self.clients.claim();
 });
 
-// Fetch event - Stale-while-revalidate strategy
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-  
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, networkResponse.clone());
-        });
-        return networkResponse;
-      }).catch(() => {
-        // Fallback or ignore if network fails and not in cache
-      });
-      return cachedResponse || fetchPromise;
-    })
-  );
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => {
+        return caches.match(OFFLINE_URL);
+      })
+    );
+  } else {
+    event.respondWith(
+      caches.match(event.request).then((response) => {
+        return response || fetch(event.request);
+      })
+    );
+  }
 });

@@ -3,14 +3,21 @@
   "name": "OSM Service Intern",
   "short_name": "OSM Intern",
   "id": "com.osm.service.intern",
-  "description": "Intelligent technical assistant for OSM service interns.",
+  "description": "Intelligent technical assistant for OSM service interns to troubleshoot vehicle issues in the field.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#16a34a",
   "orientation": "portrait",
+  "categories": ["business", "productivity", "utilities"],
+  "prefer_related_applications": false,
   "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/128/3858/3858712.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
     {
       "src": "https://cdn-icons-png.flaticon.com/512/3858/3858712.png",
       "sizes": "192x192",
@@ -21,22 +28,29 @@
       "src": "https://cdn-icons-png.flaticon.com/512/3858/3858712.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any"
     },
     {
-      "src": "https://www.gstatic.com/lamda/images/gemini_sparkle_v002_d473530c2731a8cc02392.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
+      "src": "https://cdn-icons-png.flaticon.com/512/3858/3858712.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "screenshots": [
     {
-      "src": "https://www.gstatic.com/lamda/images/gemini_sparkle_v002_d473530c2731a8cc02392.svg",
+      "src": "https://placehold.co/1280x720/16a34a/white/png?text=OSM+Service+Intern+Wide",
       "sizes": "1280x720",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "form_factor": "wide",
-      "label": "Homescreen"
+      "label": "Technical Assistant Desktop View"
+    },
+    {
+      "src": "https://placehold.co/720x1280/16a34a/white/png?text=OSM+Service+Intern+Mobile",
+      "sizes": "720x1280",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Technical Assistant Mobile View"
     }
   ]
 }
