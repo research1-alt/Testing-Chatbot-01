@@ -12,25 +12,29 @@ export interface OtpDeliveryPayload {
 }
 
 const USE_FREE_GOOGLE_SCRIPT = true; 
-// UPDATED: Using the new URL provided by the user
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxw5f15p8wF7annhM7414owKJkjWZljslS9bS2xWCSbwBvMQwkB2Fnc9A_JnomTVAKi/exec';
+
+/** 
+ * LIVE GOOGLE WEB APP URL
+ * This URL connects the app to your Google account for sending emails.
+ */
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzXbhNym4nzvxKa_vp6sVQdmVKgvlyuYi1DG-EeIeRWqxk_vCTRdHExVIj4qNHbRKloTA/exec';
 
 export const sendOtpViaGateway = async (payload: OtpDeliveryPayload): Promise<{ success: boolean; error?: string }> => {
   try {
     if (USE_FREE_GOOGLE_SCRIPT) {
-        // We use URLSearchParams which sends data as 'application/x-www-form-urlencoded'
-        // This is the most robust way to trigger Google Apps Script doPost(e)
         const formData = new URLSearchParams();
         formData.append('email', payload.email);
         formData.append('mobile', payload.mobile);
         formData.append('emailCode', payload.emailCode);
         formData.append('userName', payload.userName);
 
-        console.log("Dispatching OTP to:", GOOGLE_SCRIPT_URL);
-
+        console.log("--- OTP DISPATCH INITIATED ---");
+        console.log("Targeting Live Gateway:", GOOGLE_SCRIPT_URL);
+        
+        // Use 'no-cors' to avoid browser pre-flight blocks for script.google.com
         await fetch(GOOGLE_SCRIPT_URL, {
             method: 'POST',
-            mode: 'no-cors', // Crucial for cross-domain Google Script triggers
+            mode: 'no-cors',
             cache: 'no-cache',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded', 
@@ -38,16 +42,16 @@ export const sendOtpViaGateway = async (payload: OtpDeliveryPayload): Promise<{ 
             body: formData.toString(),
         });
 
-        // With no-cors, we assume the hit was successful.
+        // Since we use no-cors, we assume success if no network error occurs.
         return { success: true };
     }
 
     return { success: false, error: "Gateway not configured." };
   } catch (error: any) {
-    console.error('OTP Dispatch Error:', error);
+    console.error('OTP Dispatch Critical Error:', error);
     return { 
       success: false, 
-      error: 'Network error. Please check your internet or Google Script access.' 
+      error: 'Network failure. Ensure your Google Script is deployed to "Anyone".' 
     };
   }
 };

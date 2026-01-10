@@ -37,7 +37,6 @@ const useAuth = () => {
     setView('auth');
   }, []);
 
-  // Sync session across tabs and detect "Kicks old one out"
   useEffect(() => {
     const checkSession = () => {
       const currentUserStr = localStorage.getItem('currentUser');
@@ -58,7 +57,6 @@ const useAuth = () => {
       }
 
       if (globalUser && globalUser.sessionId !== currentUser.sessionId) {
-        // "New login kicks old one out"
         logout();
         alert("Session Expired: You have been logged out because your account was accessed from another device/session.");
       } else {
@@ -129,6 +127,9 @@ const useAuth = () => {
     }
   }, [ADMIN_EMAIL]);
 
+  /**
+   * Validates signup data without saving it yet.
+   */
   const signup = useCallback(async (credentials: AuthCredentials) => {
     setIsAuthLoading(true);
     setAuthError(null);
@@ -148,14 +149,31 @@ const useAuth = () => {
             return false;
         }
 
-        const hashedPassword = await hashPassword(password);
+        return true; // Validation passed
+    } catch (e) {
+        setAuthError("Validation failed.");
+        return false;
+    } finally {
+        setIsAuthLoading(false);
+    }
+  }, []);
+
+  /**
+   * Actually commits the user to storage after OTP is verified.
+   */
+  const commitSignup = useCallback(async (credentials: AuthCredentials) => {
+    try {
+        const users = JSON.parse(localStorage.getItem('users') || '[]');
+        const hashedPassword = await hashPassword(credentials.password || '');
+        
         const newUser = { 
-            name, 
-            email, 
-            mobile, 
+            name: credentials.name, 
+            email: credentials.email, 
+            mobile: credentials.mobile, 
             password: hashedPassword,
             sessionId: '' 
         };
+        
         users.push(newUser);
         localStorage.setItem('users', JSON.stringify(users));
         
@@ -163,19 +181,16 @@ const useAuth = () => {
         fetch('/api/log-signup', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, mobile, name, timestamp: new Date().toISOString() })
+            body: JSON.stringify({ ...newUser, timestamp: new Date().toISOString() })
         }).catch(() => {});
 
         return true;
     } catch (e) {
-        setAuthError("Signup failed.");
         return false;
-    } finally {
-        setIsAuthLoading(false);
     }
   }, []);
 
-  return { user, view, setView, login, finalizeLogin, signup, logout, authError, isAuthLoading };
+  return { user, view, setView, login, finalizeLogin, signup, commitSignup, logout, authError, isAuthLoading };
 };
 
 export default useAuth;

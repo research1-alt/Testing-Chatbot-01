@@ -15,7 +15,7 @@ import useAuth from './hooks/useAuth';
 const ADMIN_EMAIL = 'research1@omegaseikimobility.com';
 
 const App: React.FC = () => {
-  const { user, view, setView, login, finalizeLogin, signup, logout, authError, isAuthLoading } = useAuth();
+  const { user, view, setView, login, finalizeLogin, signup, commitSignup, logout, authError, isAuthLoading } = useAuth();
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -147,6 +147,7 @@ const App: React.FC = () => {
       onLogin={login} 
       onFinalizeLogin={finalizeLogin} 
       onSignup={signup} 
+      commitSignup={commitSignup}
       error={authError} 
       isLoading={isAuthLoading} 
     />
@@ -177,7 +178,6 @@ const App: React.FC = () => {
             <option value="ta-IN">Tamil</option>
           </select>
           
-          {/* Only Admin can see the File Upload button */}
           {isAdmin && <FileUpload onFilesStored={handleFilesStored} onError={(msg) => alert(msg)} />}
           
           <button onClick={logout} className="text-[10px] font-black bg-red-950/20 text-red-400 border border-red-900/40 px-3 py-1.5 rounded-lg hover:bg-red-600 hover:text-white transition-all uppercase tracking-widest">Logout</button>
@@ -192,7 +192,7 @@ const App: React.FC = () => {
           isKbLoading={isKbLoading}
           selectedLanguage={language}
           onOpenVideo={() => setIsVideoModalOpen(true)}
-          showVideoAction={isAdmin} // Only show video action to admin
+          showVideoAction={isAdmin}
         />
       </main>
 
