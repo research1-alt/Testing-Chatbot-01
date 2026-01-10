@@ -12,7 +12,9 @@
   "dependencies": {
     "@google/genai": "^1.25.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "resend": "^4.1.2",
+    "twilio": "^5.4.3"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

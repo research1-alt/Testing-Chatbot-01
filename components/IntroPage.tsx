@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 interface IntroPageProps {
@@ -7,27 +8,23 @@ interface IntroPageProps {
 const IntroPage: React.FC<IntroPageProps> = ({ onStart }) => {
   return (
     <div className="h-screen w-screen bg-white flex items-center justify-center font-sans text-gray-900 p-4">
-      <div className="max-w-2xl w-full bg-gray-50 border border-gray-200 rounded-lg p-8 shadow-2xl text-center flex flex-col items-center">
-        <div className="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center mb-6 ring-4 ring-blue-500/30">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h1a1 1 0 011 1v3.5a1.5 1.5 0 01-3 0V9a1 1 0 00-1-1h-1a1 1 0 01-1-1V3.5zM6.5 15.5a1.5 1.5 0 013 0V16a1 1 0 001 1h1a1 1 0 011 1v3.5a1.5 1.5 0 01-3 0V20a1 1 0 00-1-1h-1a1 1 0 01-1-1v-3.5z" />
-                <path d="M4 9.5a1.5 1.5 0 013 0V10a1 1 0 001 1h1a1 1 0 011 1v3.5a1.5 1.5 0 01-3 0V14a1 1 0 00-1-1h-1a1 1 0 01-1-1V9.5z" />
-                <path d="M16.5 3.5a1.5 1.5 0 010 3h-3.5a1.5 1.5 0 010-3h3.5z" />
-            </svg>
-        </div>
-        <h1 className="text-3xl font-bold text-gray-800 mb-3">OSM Service Intern</h1>
-        <p className="text-gray-600 mb-8 max-w-lg">
-          Your intelligent partner in the field. Upload technical manuals, troubleshooting guides, or entire project folders. Then, ask questions in natural language to get step-by-step solutions based on your documents.
+      <div className="max-w-2xl w-full bg-gray-50 border border-gray-200 rounded-2xl p-12 shadow-2xl text-center flex flex-col items-center">
+        <h1 className="text-4xl font-black text-gray-900 mb-4 tracking-tight">OSM Service Intern</h1>
+        <div className="w-16 h-1 bg-green-600 rounded-full mb-8"></div>
+        <p className="text-gray-600 mb-10 max-w-lg text-lg leading-relaxed">
+          Your intelligent partner in the field. Query technical manuals and troubleshooting guides using natural language to get instant, step-by-step solutions for OSM vehicles.
         </p>
         <button
           onClick={onStart}
-          className="bg-green-600 text-white font-semibold py-3 px-8 rounded-md hover:bg-green-700 transition-all text-lg transform hover:scale-105"
+          className="bg-green-600 text-white font-bold py-4 px-12 rounded-xl hover:bg-green-700 transition-all text-xl shadow-lg hover:shadow-green-500/20 transform hover:-translate-y-1 active:scale-95"
         >
-          Get Started
+          Initialize Session
         </button>
-        <p className="text-xs text-gray-500 mt-8">
-          Last code update: {new Date().toLocaleString()}
-        </p>
+        <div className="mt-12 pt-8 border-t border-gray-200 w-full">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              Omega Seiki Mobility • Service Intelligence
+            </p>
+        </div>
       </div>
     </div>
   );

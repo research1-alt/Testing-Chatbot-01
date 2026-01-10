@@ -6,6 +6,5 @@ export interface ChatMessage {
   timestamp: string;
   suggestions?: string[];
   unclear?: boolean;
-  imageUrl?: string;
   videoUrl?: string;
 }

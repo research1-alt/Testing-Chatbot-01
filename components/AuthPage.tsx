@@ -1,246 +1,280 @@
 
-
-import React, { useState, useEffect } from 'react';
-import { AuthCredentials } from '../hooks/useAuth';
+import React, { useState, useEffect, useRef } from 'react';
+import { AuthCredentials, LoginResult } from '../hooks/useAuth';
+import { sendOtpViaGateway } from '../services/otpService';
 
 interface AuthPageProps {
-  onLogin: (credentials: AuthCredentials) => Promise<void>;
-  onSignup: (credentials: AuthCredentials) => Promise<void>;
+  onLogin: (credentials: AuthCredentials) => Promise<LoginResult>;
+  onFinalizeLogin: (userData: any) => void;
+  onSignup: (credentials: AuthCredentials) => Promise<any>;
   error: string | null;
   isLoading: boolean;
 }
 
-const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onSignup, error: authError, isLoading }) => {
-  const [viewMode, setViewMode] = useState<'login' | 'signup' | 'forgot'>('login');
+type AuthViewMode = 'login' | 'signup' | 'otp' | 'success';
+
+const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onFinalizeLogin, onSignup, error: authError, isLoading }) => {
+  const [viewMode, setViewMode] = useState<AuthViewMode>('login');
+  const [otpPurpose, setOtpPurpose] = useState<'signup' | 'login'>('signup');
+  const [pendingUser, setPendingUser] = useState<any>(null);
+  
+  const [generatedEmailOtp, setGeneratedEmailOtp] = useState<string>('');
+  const [resendTimer, setResendTimer] = useState<number>(0);
+  const [showTroubleshoot, setShowTroubleshoot] = useState(false);
+  const [revealedCode, setRevealedCode] = useState(false);
+  
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [formError, setFormError] = useState('');
-  const [isForgotLoading, setIsForgotLoading] = useState(false);
-  const [retrievedPassword, setRetrievedPassword] = useState<string | null>(null);
+  
+  const [emailOtp, setEmailOtp] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isDelivering, setIsDelivering] = useState(false);
 
-  // When the global authError changes, display it as the formError.
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
     if (authError) {
         setFormError(authError);
     }
   }, [authError]);
 
+  useEffect(() => {
+    if (resendTimer > 0) {
+      timerRef.current = setInterval(() => {
+        setResendTimer(prev => prev - 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (viewMode === 'otp' && resendTimer === 0) setShowTroubleshoot(true);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [resendTimer, viewMode]);
+
+  const initiateRealDelivery = async (targetEmail: string, targetMobile: string, targetName: string) => {
+    setIsDelivering(true);
+    setFormError('');
+    setShowTroubleshoot(false);
+    setRevealedCode(false);
+
+    const eOtp = Math.floor(1000 + Math.random() * 9000).toString();
+    setGeneratedEmailOtp(eOtp);
+
+    try {
+        const result = await sendOtpViaGateway({
+          email: targetEmail,
+          mobile: targetMobile,
+          emailCode: eOtp,
+          userName: targetName || 'OSM User'
+        });
+
+        if (result.success) {
+          setViewMode('otp');
+          setResendTimer(15); // Faster resend for testing
+        } else {
+          setFormError(result.error || "Delivery failed.");
+        }
+    } catch (e) {
+        setFormError("Check your internet connection or script settings.");
+    } finally {
+        setIsDelivering(false);
+    }
+  };
+
   const clearForm = () => {
     setName('');
     setEmail('');
+    setMobile('');
     setPassword('');
     setFormError('');
-    setRetrievedPassword(null);
+    setEmailOtp('');
+    setPendingUser(null);
+    setGeneratedEmailOtp('');
+    setShowTroubleshoot(false);
+    setRevealedCode(false);
   };
 
-  const toggleView = () => {
-    setViewMode(viewMode === 'login' ? 'signup' : 'login');
-    clearForm();
-  };
-  
-  const validateAuthForm = () => {
-      if (viewMode === 'signup' && !name.trim()) {
-          setFormError('Name is required.');
-          return false;
-      }
-      if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email)) {
-          setFormError('Please enter a valid email address.');
-          return false;
-      }
-      if (password.length < 6) {
-          setFormError('Password must be at least 6 characters long.');
-          return false;
-      }
-      setFormError('');
-      return true;
-  }
+  const validateEmail = (e: string) => e.toLowerCase().endsWith('@omegaseikimobility.com');
 
-  const handleAuthSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!validateAuthForm()) return;
-    setFormError(''); 
-
-    const credentials = { name, email, password };
+  const handleSignupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError('');
     
-    if (viewMode === 'login') {
-        onLogin(credentials);
-    } else {
-        onSignup(credentials);
-    }
-  };
-  
-  const handleForgotSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email)) {
-        setFormError('Please enter a valid email address.');
+    if (!name || !email || !mobile || !password) {
+        setFormError("All information is required.");
         return;
     }
-    setFormError('');
-    setIsForgotLoading(true);
-    setRetrievedPassword(null);
-
-    setTimeout(() => {
-        try {
-            const storedUsers = JSON.parse(localStorage.getItem('users') || '[]');
-            const foundUser = storedUsers.find((user: any) => user.email === email);
-
-            if (foundUser) {
-                setRetrievedPassword(foundUser.password);
-            } else {
-                setFormError('No account found with this email address.');
-            }
-        } catch (e) {
-            setFormError("An unexpected error occurred. Please try again.");
-        } finally {
-            setIsForgotLoading(false);
-        }
-    }, 500);
+    if (!validateEmail(email)) {
+        setFormError("Error: Only @omegaseikimobility.com emails allowed.");
+        return;
+    }
+    
+    const success = await onSignup({ name, email, mobile, password });
+    if (success) {
+        setOtpPurpose('signup');
+        setPendingUser({ name, email, mobile });
+        initiateRealDelivery(email, mobile, name);
+    }
   };
 
-  const renderForgotView = () => (
-    <div className="max-w-md w-full bg-gray-50 border border-gray-200 rounded-lg p-8 shadow-2xl">
-        <h1 className="text-3xl font-bold text-gray-800 mb-4 text-center">
-          Retrieve Password
-        </h1>
-        <p className="text-gray-600 mb-8 text-center">
-            Enter your email to find your password.
-        </p>
-        <form onSubmit={handleForgotSubmit} className="space-y-6">
-            <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                  className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                />
-            </div>
-            
-            {formError && <p className="text-sm text-red-600 text-center">{formError}</p>}
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError('');
+    const result = await onLogin({ email, password });
+    if (result.success && result.mfaRequired) {
+        setPendingUser(result.tempUser);
+        setOtpPurpose('login');
+        initiateRealDelivery(result.tempUser.email, result.tempUser.mobile, result.tempUser.name);
+    }
+  };
 
-            {retrievedPassword && (
-              <div className="p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700">
-                  <p className="font-bold">Password Found</p>
-                  <p>Your password is: <strong>{retrievedPassword}</strong></p>
-                  <p className="text-xs mt-2"><strong>Note:</strong> This is for demonstration only. In a real application, passwords would be securely reset, not displayed.</p>
-              </div>
-            )}
+  const handleOtpVerify = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsVerifying(true);
+    setFormError('');
 
-            <div>
-                <button
-                  type="submit"
-                  disabled={isForgotLoading}
-                  className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-400 disabled:cursor-wait"
-                >
-                  {isForgotLoading ? 'Searching...' : 'Retrieve Password'}
-                </button>
-            </div>
-        </form>
-        <p className="mt-6 text-center text-sm text-gray-600">
-            Remembered your password?
-            <button onClick={() => { setViewMode('login'); clearForm(); }} className="ml-1 font-medium text-green-600 hover:text-green-500">
-                Back to Login
-            </button>
-        </p>
-        <p className="text-xs text-gray-500 mt-8 text-center">
-          Last code update: {new Date().toLocaleString()}
-        </p>
-    </div>
-  );
-
-  const renderAuthView = () => (
-      <div className="max-w-md w-full bg-gray-50 border border-gray-200 rounded-lg p-8 shadow-2xl">
-        <h1 className="text-3xl font-bold text-gray-800 mb-4 text-center">
-          {viewMode === 'login' ? 'Welcome Back!' : 'Create Account'}
-        </h1>
-        <p className="text-gray-600 mb-8 text-center">
-            {viewMode === 'login' ? 'Log in to access your assistant.' : 'Sign up to get started.'}
-        </p>
-        
-        <form onSubmit={handleAuthSubmit} className="space-y-6">
-          {viewMode === 'signup' && (
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">Name</label>
-              <input
-                id="name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-              />
-            </div>
-          )}
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-              className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-            />
-          </div>
-          <div>
-            <div className="flex justify-between items-center">
-                <label htmlFor="password"className="block text-sm font-medium text-gray-700">Password</label>
-                {viewMode === 'login' && (
-                    <div className="text-sm">
-                        <button 
-                            type="button" 
-                            onClick={() => { setViewMode('forgot'); clearForm(); }} 
-                            className="font-medium text-green-600 hover:text-green-500"
-                        >
-                            Forgot password?
-                        </button>
-                    </div>
-                )}
-            </div>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete={viewMode === 'login' ? 'current-password' : 'new-password'}
-              className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-            />
-          </div>
-          
-          {formError && <p className="text-sm text-red-600 text-center">{formError}</p>}
-
-          <div>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-400 disabled:cursor-wait"
-            >
-              {isLoading ? 'Processing...' : (viewMode === 'login' ? 'Login' : 'Sign Up')}
-            </button>
-          </div>
-        </form>
-        
-        <p className="mt-6 text-center text-sm text-gray-600">
-          {viewMode === 'login' ? "Don't have an account?" : 'Already have an account?'}
-          <button onClick={toggleView} className="ml-1 font-medium text-green-600 hover:text-green-500">
-            {viewMode === 'login' ? 'Sign Up' : 'Login'}
-          </button>
-        </p>
-        <p className="text-xs text-gray-500 mt-8 text-center">
-          Last code update: {new Date().toLocaleString()}
-        </p>
-      </div>
-  );
+    setTimeout(() => {
+        if (emailOtp === generatedEmailOtp) {
+            if (otpPurpose === 'signup') {
+                setViewMode('success'); 
+            } else {
+                onFinalizeLogin(pendingUser);
+            }
+        } else {
+            setFormError("Invalid code. Please try again.");
+            setEmailOtp('');
+        }
+        setIsVerifying(false);
+    }, 800);
+  };
 
   return (
-    <div className="h-screen w-screen bg-white flex items-center justify-center font-sans text-gray-900 p-4">
-      {viewMode === 'forgot' ? renderForgotView() : renderAuthView()}
+    <div className="min-h-screen w-full bg-slate-100 flex items-center justify-center p-4">
+        {viewMode === 'signup' && (
+            <div className="max-w-md w-full bg-white border border-slate-200 rounded-[2.5rem] p-10 shadow-2xl slide-in">
+                <div className="mb-8 border-b pb-4">
+                    <h2 className="text-3xl font-black text-slate-900 tracking-tight">Registration</h2>
+                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Service Intern Onboarding</p>
+                </div>
+                <form onSubmit={handleSignupSubmit} className="space-y-4">
+                    <div className="space-y-1">
+                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest block ml-1">Full Name</label>
+                        <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-green-600 outline-none font-bold text-slate-900" placeholder="John Doe" required />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest block ml-1">Official Email</label>
+                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-green-600 outline-none font-bold text-slate-900" placeholder="id@omegaseikimobility.com" required />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest block ml-1">Mobile</label>
+                        <input type="tel" value={mobile} onChange={e => setMobile(e.target.value)} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-green-600 outline-none font-bold text-slate-900" placeholder="+91 XXXX XXXX" required />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest block ml-1">Password</label>
+                        <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-green-600 outline-none font-bold text-slate-900" placeholder="••••••••" required />
+                    </div>
+                    {formError && <div className="p-4 bg-red-50 text-red-600 text-[11px] font-bold rounded-2xl border border-red-100">{formError}</div>}
+                    <button type="submit" disabled={isLoading || isDelivering} className="w-full py-5 bg-green-600 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-green-700 transition-all shadow-xl disabled:bg-slate-300">
+                        {isDelivering ? 'Delivering OTP...' : (isLoading ? 'Processing...' : 'Register Now')}
+                    </button>
+                </form>
+                <div className="mt-8 text-center">
+                    <button onClick={() => { setViewMode('login'); clearForm(); }} className="text-xs font-bold text-slate-400 hover:text-green-600 uppercase tracking-widest">Already have an account? <span className="underline font-black text-slate-600 ml-1">Login</span></button>
+                </div>
+            </div>
+        )}
+
+        {viewMode === 'otp' && (
+            <div className="max-w-md w-full bg-white border border-slate-200 rounded-[2.5rem] p-10 shadow-2xl slide-in">
+                <div className="text-center mb-10">
+                    <div className="w-20 h-20 bg-green-50 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                    </div>
+                    <h2 className="text-3xl font-black text-slate-900">OTP Sent</h2>
+                    <p className="text-slate-500 text-[11px] font-bold mt-2 uppercase tracking-widest">Verify identity to continue</p>
+                </div>
+
+                <form onSubmit={handleOtpVerify} className="space-y-8">
+                    <div className="relative group">
+                        <input type="text" maxLength={4} value={emailOtp} onChange={e => setEmailOtp(e.target.value)} className="w-full text-center py-6 bg-slate-50 border border-slate-200 rounded-3xl focus:ring-4 focus:ring-green-100 outline-none font-black text-5xl text-slate-900 tracking-[0.6em] transition-all" placeholder="----" required />
+                        {revealedCode && (
+                          <div className="absolute -top-10 left-0 right-0 text-center text-xs font-black text-green-600 bg-green-50 py-1 rounded-full animate-bounce">
+                            CODE: {generatedEmailOtp}
+                          </div>
+                        )}
+                    </div>
+                    
+                    {formError && <div className="p-4 bg-red-50 text-red-600 text-xs font-bold rounded-2xl border border-red-100 text-center">{formError}</div>}
+                    
+                    <button type="submit" disabled={isVerifying || isDelivering} className="w-full py-5 bg-green-600 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-green-700 shadow-xl">
+                        {isVerifying ? 'Verifying...' : 'Validate & Open Portal'}
+                    </button>
+
+                    <div className="flex flex-col gap-4 text-center">
+                        <button type="button" disabled={resendTimer > 0} onClick={() => initiateRealDelivery(pendingUser?.email, pendingUser?.mobile, pendingUser?.name)} className={`text-[11px] font-black uppercase tracking-[0.1em] ${resendTimer > 0 ? 'text-slate-300' : 'text-slate-500 hover:text-green-600'}`}>
+                            {resendTimer > 0 ? `Resend Code in ${resendTimer}s` : 'Request New OTP'}
+                        </button>
+
+                        <div className="p-5 bg-slate-50 rounded-3xl border border-slate-200 text-left">
+                            <p className="text-[10px] font-black text-slate-400 uppercase mb-3">Didn't get the email?</p>
+                            <ul className="text-[11px] text-slate-500 space-y-2 font-bold leading-tight">
+                                <li className="flex gap-2"><span>1.</span> Check **Spam** folder.</li>
+                                <li className="flex gap-2"><span>2.</span> Ensure Script Access is **"Anyone"**.</li>
+                                <li className="flex gap-2 text-green-700">
+                                   <button type="button" onClick={() => setRevealedCode(true)} className="underline hover:text-green-900">3. Click here to reveal code for testing.</button>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        )}
+
+        {viewMode === 'success' && (
+            <div className="max-w-md w-full bg-white border border-slate-200 rounded-[2.5rem] p-12 shadow-2xl text-center slide-in">
+                <div className="w-24 h-24 bg-green-50 text-green-600 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                </div>
+                <h2 className="text-3xl font-black text-slate-900 mb-2">Success!</h2>
+                <p className="text-slate-500 text-sm mb-10 font-bold uppercase tracking-widest">Identity Verified</p>
+                <button onClick={() => { setViewMode('login'); clearForm(); }} className="w-full py-5 bg-green-600 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-green-700 shadow-xl">
+                    Back to Login
+                </button>
+            </div>
+        )}
+
+        {viewMode === 'login' && (
+            <div className="max-w-md w-full bg-white border border-slate-200 rounded-[2.5rem] p-10 shadow-2xl slide-in">
+                <div className="text-center mb-10">
+                    <div className="inline-block bg-green-600 p-3 rounded-2xl mb-4 shadow-lg">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                    </div>
+                    <h2 className="text-3xl font-black text-slate-900 tracking-tight">OSM Hub</h2>
+                    <p className="text-slate-500 text-[10px] mt-1 font-black uppercase tracking-[0.3em] opacity-60">Service Intelligence Portal</p>
+                </div>
+                <form onSubmit={handleLoginSubmit} className="space-y-5">
+                    <div className="space-y-1">
+                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest block ml-1">Email ID</label>
+                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-50 outline-none font-bold text-slate-900 transition-all" placeholder="id@omegaseikimobility.com" required />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest block ml-1">Password</label>
+                        <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-green-50 outline-none font-bold text-slate-900 transition-all" placeholder="••••••••" required />
+                    </div>
+                    {formError && <div className="p-4 bg-red-50 text-red-600 text-xs font-bold rounded-2xl border border-red-100 text-center">{formError}</div>}
+                    <button type="submit" disabled={isLoading} className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-slate-800 shadow-xl transition-all">
+                        {isLoading ? 'Authenticating...' : 'Enter Hub'}
+                    </button>
+                </form>
+                <div className="mt-10 text-center">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        New Intern? <button onClick={() => { setViewMode('signup'); clearForm(); }} className="ml-2 text-green-600 hover:underline font-black">Register Account</button>
+                    </p>
+                </div>
+            </div>
+        )}
     </div>
   );
 };
