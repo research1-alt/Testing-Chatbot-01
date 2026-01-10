@@ -4,6 +4,7 @@ import ChatWindow from './components/ChatWindow';
 import IntroPage from './components/IntroPage';
 import AuthPage from './components/AuthPage';
 import FileUpload from './components/FileUpload';
+import AdminDashboard from './components/AdminDashboard';
 import VideoGeneratorModal from './components/VideoGeneratorModal';
 import { ChatMessage } from './types';
 import { getChatbotResponse, generateVideo } from './services/geminiService';
@@ -15,13 +16,17 @@ import useAuth from './hooks/useAuth';
 const ADMIN_EMAIL = 'research1@omegaseikimobility.com';
 
 const App: React.FC = () => {
-  const { user, view, setView, login, finalizeLogin, signup, commitSignup, logout, authError, isAuthLoading } = useAuth();
+  const { 
+    user, view, setView, login, finalizeLogin, signup, commitSignup, 
+    logout, authError, isAuthLoading, getAllInterns, deleteIntern 
+  } = useAuth();
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isKbLoading, setIsKbLoading] = useState(false);
   const [kbContent, setKbContent] = useState<string>('');
   const [language, setLanguage] = useState('en-US');
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
   
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
@@ -114,6 +119,12 @@ const App: React.FC = () => {
     await loadKnowledgeBase();
   };
 
+  const handleDeleteIntern = (email: string) => {
+    if (confirm("Permanently remove this intern's access?")) {
+        deleteIntern(email);
+    }
+  };
+
   const handleVideoSubmit = async (image: File, prompt: string, ratio: '16:9' | '9:16') => {
     setIsGeneratingVideo(true);
     setVideoError(null);
@@ -166,34 +177,52 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <select 
-            value={language} 
-            onChange={(e) => setLanguage(e.target.value)}
-            className="bg-slate-800 border-none text-slate-300 rounded-lg text-[10px] font-black py-1.5 px-3 focus:ring-0 outline-none uppercase tracking-widest cursor-pointer"
-          >
-            <option value="en-US">English</option>
-            <option value="hi-IN">Hindi</option>
-            <option value="mr-IN">Marathi</option>
-            <option value="ta-IN">Tamil</option>
-          </select>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <button 
+              onClick={() => setShowAdminPanel(!showAdminPanel)} 
+              className={`text-[10px] font-black px-3 py-1.5 rounded-lg transition-all uppercase tracking-widest ${showAdminPanel ? 'bg-green-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+            >
+              {showAdminPanel ? 'Exit Directory' : 'Intern Directory'}
+            </button>
+          )}
+
+          {!showAdminPanel && (
+            <select 
+                value={language} 
+                onChange={(e) => setLanguage(e.target.value)}
+                className="bg-slate-800 border-none text-slate-300 rounded-lg text-[10px] font-black py-1.5 px-3 focus:ring-0 outline-none uppercase tracking-widest cursor-pointer"
+            >
+                <option value="en-US">English</option>
+                <option value="hi-IN">Hindi</option>
+                <option value="mr-IN">Marathi</option>
+                <option value="ta-IN">Tamil</option>
+            </select>
+          )}
           
-          {isAdmin && <FileUpload onFilesStored={handleFilesStored} onError={(msg) => alert(msg)} />}
+          {!showAdminPanel && isAdmin && <FileUpload onFilesStored={handleFilesStored} onError={(msg) => alert(msg)} />}
           
           <button onClick={logout} className="text-[10px] font-black bg-red-950/20 text-red-400 border border-red-900/40 px-3 py-1.5 rounded-lg hover:bg-red-600 hover:text-white transition-all uppercase tracking-widest">Logout</button>
         </div>
       </header>
 
       <main className="flex-1 overflow-hidden relative flex flex-col">
-        <ChatWindow 
-          messages={messages} 
-          onSendMessage={handleSendMessage} 
-          isLoading={isLoading} 
-          isKbLoading={isKbLoading}
-          selectedLanguage={language}
-          onOpenVideo={() => setIsVideoModalOpen(true)}
-          showVideoAction={isAdmin}
-        />
+        {showAdminPanel && isAdmin ? (
+          <AdminDashboard 
+            interns={getAllInterns()} 
+            onDelete={handleDeleteIntern} 
+          />
+        ) : (
+          <ChatWindow 
+            messages={messages} 
+            onSendMessage={handleSendMessage} 
+            isLoading={isLoading} 
+            isKbLoading={isKbLoading}
+            selectedLanguage={language}
+            onOpenVideo={() => setIsVideoModalOpen(true)}
+            showVideoAction={isAdmin}
+          />
+        )}
       </main>
 
       {isAdmin && (

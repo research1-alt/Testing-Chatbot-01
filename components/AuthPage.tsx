@@ -108,11 +108,17 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onFinalizeLogin, onSignup,
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
+    
+    if (!email || !password) {
+        setFormError("ID and password required.");
+        return;
+    }
+
     const result = await onLogin({ email, password });
-    if (result.success && result.mfaRequired) {
-        setPendingUser(result.tempUser);
-        setOtpPurpose('login');
-        initiateOtpDelivery(result.tempUser.email, result.tempUser.mobile, result.tempUser.name);
+    if (result.success && result.tempUser) {
+        onFinalizeLogin(result.tempUser);
+    } else if (result.error) {
+        setFormError(result.error);
     }
   };
 

@@ -1,11 +1,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { hashPassword } from '../utils/crypto';
+import { logInternRegistration } from '../services/otpService';
 
 export type User = {
   name: string;
   email: string;
   sessionId?: string;
+  mobile?: string;
+  registeredAt?: string;
 };
 
 export type AuthCredentials = {
@@ -41,39 +44,65 @@ const useAuth = () => {
     const checkSession = () => {
       const currentUserStr = localStorage.getItem('currentUser');
       if (!currentUserStr) {
-        if (user) logout();
         return;
       }
 
-      const currentUser = JSON.parse(currentUserStr);
-      const allUsers = JSON.parse(localStorage.getItem('users') || '[]');
-      
-      const globalUser = allUsers.find((u: any) => u.email.toLowerCase() === currentUser.email.toLowerCase());
-      
-      if (currentUser.email === ADMIN_EMAIL) {
-         setUser(currentUser);
-         setView('chat');
-         return;
-      }
+      try {
+        const currentUser = JSON.parse(currentUserStr);
+        const allUsers = JSON.parse(localStorage.getItem('users') || '[]');
+        
+        const globalUser = allUsers.find((u: any) => u.email.toLowerCase() === currentUser.email.toLowerCase());
+        
+        if (currentUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+           setUser(currentUser);
+           setView('chat');
+           return;
+        }
 
-      if (globalUser && globalUser.sessionId !== currentUser.sessionId) {
-        logout();
-        alert("Session Expired: You have been logged out because your account was accessed from another device/session.");
-      } else {
-        setUser(currentUser);
-        setView('chat');
+        if (globalUser && globalUser.sessionId !== currentUser.sessionId) {
+          logout();
+          alert("Session Expired: Account accessed from another device/session.");
+        } else if (globalUser) {
+          setUser(currentUser);
+          setView('chat');
+        }
+      } catch (e) {
+        console.error("Session check error", e);
       }
     };
 
     checkSession();
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'users' || e.key === 'currentUser') {
+      if (e.key === 'currentUser') {
         checkSession();
       }
     };
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
-  }, [user, logout, ADMIN_EMAIL]);
+  }, [logout, ADMIN_EMAIL]);
+
+  const finalizeLogin = useCallback((userData: any) => {
+    const newSessionId = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+    const storedUsers = JSON.parse(localStorage.getItem('users') || '[]');
+    const lowerEmail = userData.email.toLowerCase();
+    
+    const userIndex = storedUsers.findIndex((u: any) => u.email.toLowerCase() === lowerEmail);
+
+    const userToAuth = { 
+        name: userData.name, 
+        email: lowerEmail,
+        sessionId: newSessionId 
+    };
+
+    if (userIndex !== -1) {
+        storedUsers[userIndex].sessionId = newSessionId;
+        localStorage.setItem('users', JSON.stringify(storedUsers));
+    }
+
+    localStorage.setItem('currentUser', JSON.stringify(userToAuth));
+    setUser(userToAuth);
+    setView('chat');
+  }, []);
 
   const login = useCallback(async (credentials: AuthCredentials): Promise<LoginResult> => {
     setIsAuthLoading(true);
@@ -83,20 +112,21 @@ const useAuth = () => {
         const { email, password } = credentials;
         if (!password) return { success: false, error: "Password required." };
         const hashedPassword = await hashPassword(password);
+        const lowerEmail = email.toLowerCase();
         
-        if (email.toLowerCase() === ADMIN_EMAIL && hashedPassword === ADMIN_HASH) {
-            return { success: true, mfaRequired: true, tempUser: { name: 'Admin', email: ADMIN_EMAIL } };
+        if (lowerEmail === ADMIN_EMAIL.toLowerCase() && hashedPassword === ADMIN_HASH) {
+            return { success: true, mfaRequired: false, tempUser: { name: 'Admin', email: ADMIN_EMAIL } };
         }
 
         const storedUsers = JSON.parse(localStorage.getItem('users') || '[]');
         const targetUser = storedUsers.find(
-            (u: any) => u.email.toLowerCase() === email.toLowerCase() && u.password === hashedPassword
+            (u: any) => u.email.toLowerCase() === lowerEmail && u.password === hashedPassword
         );
 
         if (targetUser) {
-            return { success: true, mfaRequired: true, tempUser: targetUser };
+            return { success: true, mfaRequired: false, tempUser: targetUser };
         } else {
-            return { success: false, error: 'Invalid mail id or password.' };
+            return { success: false, error: 'Invalid email or password.' };
         }
     } catch (e) {
         return { success: false, error: "Authentication failed." };
@@ -105,31 +135,6 @@ const useAuth = () => {
     }
   }, [ADMIN_HASH, ADMIN_EMAIL]);
 
-  const finalizeLogin = useCallback((userData: any) => {
-    const newSessionId = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
-    const storedUsers = JSON.parse(localStorage.getItem('users') || '[]');
-    const userIndex = storedUsers.findIndex((u: any) => u.email.toLowerCase() === userData.email.toLowerCase());
-
-    if (userIndex !== -1 || userData.email === ADMIN_EMAIL) {
-        if (userIndex !== -1) {
-            storedUsers[userIndex].sessionId = newSessionId;
-            localStorage.setItem('users', JSON.stringify(storedUsers));
-        }
-
-        const userToAuth = { 
-            name: userData.name, 
-            email: userData.email,
-            sessionId: newSessionId 
-        };
-        localStorage.setItem('currentUser', JSON.stringify(userToAuth));
-        setUser(userToAuth);
-        setView('chat');
-    }
-  }, [ADMIN_EMAIL]);
-
-  /**
-   * Validates signup data without saving it yet.
-   */
   const signup = useCallback(async (credentials: AuthCredentials) => {
     setIsAuthLoading(true);
     setAuthError(null);
@@ -149,7 +154,7 @@ const useAuth = () => {
             return false;
         }
 
-        return true; // Validation passed
+        return true; 
     } catch (e) {
         setAuthError("Validation failed.");
         return false;
@@ -158,31 +163,31 @@ const useAuth = () => {
     }
   }, []);
 
-  /**
-   * Actually commits the user to storage after OTP is verified.
-   */
   const commitSignup = useCallback(async (credentials: AuthCredentials) => {
     try {
         const users = JSON.parse(localStorage.getItem('users') || '[]');
         const hashedPassword = await hashPassword(credentials.password || '');
+        const timestamp = new Date().toISOString();
         
         const newUser = { 
             name: credentials.name, 
-            email: credentials.email, 
+            email: credentials.email.toLowerCase(), 
             mobile: credentials.mobile, 
             password: hashedPassword,
+            registeredAt: timestamp,
             sessionId: '' 
         };
         
         users.push(newUser);
         localStorage.setItem('users', JSON.stringify(users));
         
-        // Log to simulated spreadsheet
-        fetch('/api/log-signup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...newUser, timestamp: new Date().toISOString() })
-        }).catch(() => {});
+        // Log to Google Sheet via the new Gateway URL
+        await logInternRegistration({
+            email: newUser.email,
+            mobile: newUser.mobile || '',
+            userName: newUser.name || '',
+            emailCode: '' // Sending empty code indicates signup log to the Apps Script
+        });
 
         return true;
     } catch (e) {
@@ -190,7 +195,20 @@ const useAuth = () => {
     }
   }, []);
 
-  return { user, view, setView, login, finalizeLogin, signup, commitSignup, logout, authError, isAuthLoading };
+  const getAllInterns = useCallback(() => {
+    return JSON.parse(localStorage.getItem('users') || '[]') as User[];
+  }, []);
+
+  const deleteIntern = useCallback((email: string) => {
+    const users = JSON.parse(localStorage.getItem('users') || '[]');
+    const filtered = users.filter((u: any) => u.email.toLowerCase() !== email.toLowerCase());
+    localStorage.setItem('users', JSON.stringify(filtered));
+  }, []);
+
+  return { 
+    user, view, setView, login, finalizeLogin, signup, commitSignup, 
+    logout, authError, isAuthLoading, getAllInterns, deleteIntern 
+  };
 };
 
 export default useAuth;
