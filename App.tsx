@@ -39,6 +39,14 @@ const App: React.FC = () => {
 
   const isAdmin = user?.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
+  const getInitialMessage = (): ChatMessage => ({
+    id: 'initial-bot-message-' + Date.now(),
+    text: `Welcome to the OSM Intelligence Hub.\n\nHow can I help you with technical manuals, relay circuits, or vehicle troubleshooting today?`,
+    sender: 'bot',
+    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    suggestions: ["Relay Pin Mapping", "Ignition Sequence", "Fuse Box Layout"]
+  });
+
   const loadKnowledgeBase = useCallback(async () => {
     setIsKbLoading(true);
     try {
@@ -66,13 +74,7 @@ const App: React.FC = () => {
     if (view === 'chat') {
       loadKnowledgeBase();
       if (messages.length === 0) {
-        setMessages([{
-          id: 'initial-bot-message',
-          text: `Welcome to the OSM Intelligence Hub.\n\nHow can I help you with technical manuals, relay circuits, or vehicle troubleshooting today?`,
-          sender: 'bot',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          suggestions: ["Relay Pin Mapping", "Ignition Sequence", "Fuse Box Layout"]
-        }]);
+        setMessages([getInitialMessage()]);
       }
     }
   }, [view, loadKnowledgeBase, messages.length]);
@@ -132,6 +134,13 @@ const App: React.FC = () => {
       }]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResetChat = () => {
+    if (confirm("Clear this conversation and start fresh?")) {
+        setMessages([getInitialMessage()]);
+        setIsMenuOpen(false);
     }
   };
 
@@ -282,7 +291,19 @@ const App: React.FC = () => {
                   </div>
                 )}
 
-                <div className="border-t border-slate-100 mt-1 pt-2">
+                <div className="border-t border-slate-100 mt-1 pt-2 space-y-1">
+                  <button 
+                    onClick={handleResetChat}
+                    className="flex items-center gap-3 w-full p-3 hover:bg-blue-50 rounded-xl transition-colors text-slate-700"
+                  >
+                    <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    </div>
+                    <span className="text-xs font-black uppercase tracking-widest">Reset Chat</span>
+                  </button>
+
                   <a 
                     href="https://forms.gle/YcrerYAazwxi5zXL7" 
                     target="_blank" 
@@ -290,12 +311,12 @@ const App: React.FC = () => {
                     className="flex items-center gap-3 w-full p-3 hover:bg-slate-50 rounded-xl transition-colors text-slate-700"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                    <div className="w-8 h-8 bg-slate-100 text-slate-600 rounded-lg flex items-center justify-center">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                       </svg>
                     </div>
-                    <span className="text-xs font-black uppercase tracking-widest">Share Feedback</span>
+                    <span className="text-xs font-black uppercase tracking-widest">Feedback</span>
                   </a>
 
                   <button 
@@ -307,7 +328,7 @@ const App: React.FC = () => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                       </svg>
                     </div>
-                    <span className="text-xs font-black uppercase tracking-widest">Logout Session</span>
+                    <span className="text-xs font-black uppercase tracking-widest">Logout</span>
                   </button>
                 </div>
               </div>
