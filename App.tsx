@@ -8,7 +8,7 @@ import AdminDashboard from './components/AdminDashboard';
 import VideoGeneratorModal from './components/VideoGeneratorModal';
 import { ChatMessage } from './types';
 import { getChatbotResponse, generateVideo } from './services/geminiService';
-import { addFile, getAllFiles, StoredFile } from './utils/db';
+import { addFile, deleteFile, getAllFiles, StoredFile } from './utils/db';
 import { fileToBase64 } from './utils/fileParser';
 import { matelEvKnowledgeBase } from './defaultLibrary';
 import useAuth from './hooks/useAuth';
@@ -25,6 +25,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isKbLoading, setIsKbLoading] = useState(false);
   const [kbContent, setKbContent] = useState<string>('');
+  const [kbFiles, setKbFiles] = useState<StoredFile[]>([]);
   const [language, setLanguage] = useState('en-US');
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   
@@ -45,6 +46,7 @@ const App: React.FC = () => {
         storedFiles = await getAllFiles();
       }
       
+      setKbFiles(storedFiles);
       const combined = storedFiles
         .map(f => `FILE: ${f.name}\n---\n${f.content}\n---`)
         .join('\n\n');
@@ -62,10 +64,10 @@ const App: React.FC = () => {
       if (messages.length === 0) {
         setMessages([{
           id: 'initial-bot-message',
-          text: `Identification Verified: ${user?.name}. OSM Service Intelligence is online.\n\nI have indexed the **MATEL Technical Manuals**. Please specify the vehicle fault or relay pinout you are investigating.`,
+          text: `Identification Verified: ${user?.name}. OSM Service Intelligence Hub is online.\n\nI have indexed the technical library. Please specify the vehicle fault, relay circuit, or MCU pinout you are investigating.`,
           sender: 'bot',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          suggestions: ["Relay Pin Mapping", "Ignition Logic Flow", "Fuse Box Layout"]
+          suggestions: ["Relay Pin Mapping", "Ignition Sequence", "Fuse Box Layout"]
         }]);
       }
     }
@@ -87,7 +89,7 @@ const App: React.FC = () => {
     try {
       const history = messages
         .slice(-6)
-        .map(m => `${m.sender === 'bot' ? 'Assistant' : 'Intern'}: ${m.text}`)
+        .map(m => `${m.sender === 'bot' ? 'Hub' : 'Intern'}: ${m.text}`)
         .join('\n');
 
       const response = await getChatbotResponse(text, kbContent, history, language);
@@ -120,8 +122,15 @@ const App: React.FC = () => {
   };
 
   const handleDeleteIntern = (email: string) => {
-    if (confirm("Permanently remove this intern's access?")) {
+    if (confirm("Permanently revoke access for this intern?")) {
         deleteIntern(email);
+    }
+  };
+
+  const handleDeleteFile = async (name: string) => {
+    if (confirm(`Remove manual "${name}" from the technical library?`)) {
+        await deleteFile(name);
+        await loadKnowledgeBase();
     }
   };
 
@@ -137,7 +146,7 @@ const App: React.FC = () => {
       } else if (result.videoUrl) {
         const videoMsg: ChatMessage = {
           id: 'vid-' + Date.now(),
-          text: `Visualization successfully generated for: "${prompt}"`,
+          text: `Technical visualization generated for: "${prompt}"`,
           sender: 'bot',
           timestamp: new Date().toLocaleTimeString(),
           videoUrl: result.videoUrl
@@ -181,9 +190,9 @@ const App: React.FC = () => {
           {isAdmin && (
             <button 
               onClick={() => setShowAdminPanel(!showAdminPanel)} 
-              className={`text-[10px] font-black px-3 py-1.5 rounded-lg transition-all uppercase tracking-widest ${showAdminPanel ? 'bg-green-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              className={`text-[10px] font-black px-3 py-1.5 rounded-lg transition-all uppercase tracking-widest ${showAdminPanel ? 'bg-green-600 text-white shadow-[0_0_15px_rgba(22,163,74,0.4)]' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
             >
-              {showAdminPanel ? 'Exit Directory' : 'Intern Directory'}
+              {showAdminPanel ? 'Technical Hub' : 'Admin Panel'}
             </button>
           )}
 
@@ -210,7 +219,9 @@ const App: React.FC = () => {
         {showAdminPanel && isAdmin ? (
           <AdminDashboard 
             interns={getAllInterns()} 
-            onDelete={handleDeleteIntern} 
+            onDeleteIntern={handleDeleteIntern} 
+            kbFiles={kbFiles}
+            onDeleteFile={handleDeleteFile}
           />
         ) : (
           <ChatWindow 

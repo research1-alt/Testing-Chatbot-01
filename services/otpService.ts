@@ -1,7 +1,8 @@
-
 /**
- * OTP Service Gateway
- * Handles communication with Google Apps Script for email delivery and signup logging.
+ * OTP Service & Registration Gateway
+ * Handles communication with Google Apps Script for email delivery and spreadsheet logging.
+ * 
+ * Target Spreadsheet: https://docs.google.com/spreadsheets/d/1VAxeaMJz_epaw1o0Q-WCnB9-on3-i5ySbmALevZigW8/
  */
 
 export interface OtpDeliveryPayload {
@@ -9,23 +10,29 @@ export interface OtpDeliveryPayload {
   mobile: string;
   emailCode: string;
   userName: string;
+  status?: string;
+  timestamp?: string;
 }
 
 /** 
- * LIVE GOOGLE WEB APP URL
- * This URL connects the app to your Google account for sending emails and logging signups.
+ * GOOGLE WEB APP URL
+ * This is the endpoint for your Google Apps Script deployment.
  */
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxfXzbCQ_tgtxHqAazUVZwk6sZC3Wmsp6hq2wf9f8VeRGlmU2q87KH4ISx2OsY5CrrweQ/exec';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzmwCesT3jwii8PONR_8X02WlzrxigdUDyacic9V2vqS1DafSnIpsx2rFlHxfvMyUC9Jw/exec';
 
 export const sendOtpViaGateway = async (payload: OtpDeliveryPayload): Promise<{ success: boolean; error?: string }> => {
   try {
     const formData = new URLSearchParams();
     formData.append('email', payload.email);
     formData.append('mobile', payload.mobile);
-    formData.append('emailCode', payload.emailCode);
+    formData.append('emailCode', payload.emailCode || ''); 
     formData.append('userName', payload.userName);
+    formData.append('status', payload.status || (payload.emailCode ? 'OTP_PENDING' : 'REGISTRATION_LOG'));
+    formData.append('timestamp', payload.timestamp || new Date().toLocaleString());
 
-    // Use 'no-cors' to avoid browser pre-flight blocks for script.google.com
+    // Use 'no-cors' to allow cross-origin requests to Google Scripts.
+    // Note: With no-cors, we won't be able to read the response body, 
+    // but the request will still reach the script and execute successfully.
     await fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors',
@@ -36,20 +43,23 @@ export const sendOtpViaGateway = async (payload: OtpDeliveryPayload): Promise<{ 
         body: formData.toString(),
     });
 
-    // Since we use no-cors, we assume success if no network error occurs.
     return { success: true };
   } catch (error: any) {
-    console.error('OTP Dispatch Critical Error:', error);
+    console.error('Spreadsheet Gateway Error:', error);
     return { 
       success: false, 
-      error: 'Network failure. Ensure your Google Script is deployed correctly.' 
+      error: 'Connection to registration server failed. Please check your internet connection.' 
     };
   }
 };
 
 /**
- * Specifically used to log verified signups to your Google Sheet.
+ * Logs a verified intern signup to your Google Spreadsheet.
  */
 export const logInternRegistration = async (payload: OtpDeliveryPayload) => {
-    return sendOtpViaGateway(payload);
+    return sendOtpViaGateway({
+        ...payload,
+        status: 'VERIFIED_SIGNUP',
+        timestamp: new Date().toLocaleString()
+    });
 };
