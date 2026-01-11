@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import ChatWindow from './components/ChatWindow';
 import IntroPage from './components/IntroPage';
 import AuthPage from './components/AuthPage';
@@ -18,7 +18,8 @@ const ADMIN_EMAIL = 'research1@omegaseikimobility.com';
 const App: React.FC = () => {
   const { 
     user, view, setView, login, finalizeLogin, signup, commitSignup, 
-    logout, authError, isAuthLoading, getAllInterns, deleteIntern 
+    logout, authError, isAuthLoading, getAllInterns, deleteIntern,
+    checkEmailExists, resetPassword
   } = useAuth();
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -28,6 +29,9 @@ const App: React.FC = () => {
   const [kbFiles, setKbFiles] = useState<StoredFile[]>([]);
   const [language, setLanguage] = useState('en-US');
   const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
@@ -64,14 +68,29 @@ const App: React.FC = () => {
       if (messages.length === 0) {
         setMessages([{
           id: 'initial-bot-message',
-          text: `Identification Verified: ${user?.name}. OSM Service Intelligence Hub is online.\n\nI have indexed the technical library. Please specify the vehicle fault, relay circuit, or MCU pinout you are investigating.`,
+          text: `Welcome to the OSM Intelligence Hub.\n\nHow can I help you with technical manuals, relay circuits, or vehicle troubleshooting today?`,
           sender: 'bot',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           suggestions: ["Relay Pin Mapping", "Ignition Sequence", "Fuse Box Layout"]
         }]);
       }
     }
-  }, [view, user?.name, loadKnowledgeBase, messages.length]);
+  }, [view, loadKnowledgeBase, messages.length]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+        setIsLangMenuOpen(false);
+      }
+    };
+    if (isMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMenuOpen]);
 
   const handleSendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
@@ -168,25 +187,52 @@ const App: React.FC = () => {
       onFinalizeLogin={finalizeLogin} 
       onSignup={signup} 
       commitSignup={commitSignup}
+      checkEmailExists={checkEmailExists}
+      resetPassword={resetPassword}
       error={authError} 
       isLoading={isAuthLoading} 
     />
   );
 
+  const languages = [
+    { code: 'en-US', name: 'English' },
+    { code: 'hi-IN', name: 'Hindi' },
+    { code: 'bn-IN', name: 'Bengali' },
+    { code: 'te-IN', name: 'Telugu' },
+    { code: 'mr-IN', name: 'Marathi' },
+    { code: 'ta-IN', name: 'Tamil' },
+    { code: 'ur-IN', name: 'Urdu' },
+    { code: 'gu-IN', name: 'Gujarati' },
+    { code: 'kn-IN', name: 'Kannada' },
+    { code: 'ml-IN', name: 'Malayalam' },
+    { code: 'pa-IN', name: 'Punjabi' },
+    { code: 'as-IN', name: 'Assamese' },
+    { code: 'or-IN', name: 'Odia' },
+    { code: 'ks-IN', name: 'Kashmiri' },
+    { code: 'sd-IN', name: 'Sindhi' },
+    { code: 'sa-IN', name: 'Sanskrit' },
+    { code: 'kok-IN', name: 'Konkani' },
+    { code: 'mni-IN', name: 'Manipuri' },
+    { code: 'ne-IN', name: 'Nepali' },
+    { code: 'doi-IN', name: 'Dogri' },
+    { code: 'mai-IN', name: 'Maithili' },
+    { code: 'sat-IN', name: 'Santali' },
+    { code: 'brx-IN', name: 'Bodo' },
+  ];
+
+  const currentLanguageName = languages.find(l => l.code === language)?.name || 'English';
+
   return (
-    <div className="flex flex-col h-screen max-w-5xl mx-auto border-x bg-gray-50 shadow-2xl overflow-hidden font-sans">
+    <div className="flex flex-col h-screen max-w-5xl mx-auto border-x bg-gray-50 shadow-2xl overflow-hidden font-sans text-slate-900">
       <header className="bg-slate-900 text-white p-4 flex justify-between items-center shadow-lg z-20">
         <div className="flex items-center gap-3">
-          <div className="bg-green-600 p-2 rounded-xl">
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-          </div>
-          <div className="hidden sm:block">
-            <h1 className="font-black text-sm uppercase tracking-tighter">OSM Hub</h1>
-            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{user?.name} {isAdmin ? '(ADMIN)' : '(USER)'}</p>
+          <div>
+            <h1 className="font-black text-xl sm:text-2xl uppercase tracking-tighter">OSM</h1>
+            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{user?.name} {isAdmin ? '(ADMIN)' : ''}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3 relative" ref={menuRef}>
           {isAdmin && (
             <button 
               onClick={() => setShowAdminPanel(!showAdminPanel)} 
@@ -196,22 +242,81 @@ const App: React.FC = () => {
             </button>
           )}
 
-          {!showAdminPanel && (
-            <select 
-                value={language} 
-                onChange={(e) => setLanguage(e.target.value)}
-                className="bg-slate-800 border-none text-slate-300 rounded-lg text-[10px] font-black py-1.5 px-3 focus:ring-0 outline-none uppercase tracking-widest cursor-pointer"
-            >
-                <option value="en-US">English</option>
-                <option value="hi-IN">Hindi</option>
-                <option value="mr-IN">Marathi</option>
-                <option value="ta-IN">Tamil</option>
-            </select>
+          {isAdmin && !showAdminPanel && <FileUpload onFilesStored={handleFilesStored} onError={(msg) => alert(msg)} />}
+          
+          <button 
+            onClick={() => { setIsMenuOpen(!isMenuOpen); setIsLangMenuOpen(false); }} 
+            className="p-2 bg-slate-800 rounded-xl hover:bg-slate-700 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16m-7 6h7" />
+            </svg>
+          </button>
+
+          {isMenuOpen && (
+            <div className="absolute top-12 right-0 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden slide-in z-50">
+              <div className="p-3">
+                <button 
+                  onClick={() => setIsLangMenuOpen(!isLangMenuOpen)}
+                  className="flex items-center justify-between w-full p-4 bg-slate-900 rounded-2xl text-white transition-all shadow-lg active:scale-95 mb-3"
+                >
+                  <span className="text-sm font-black uppercase tracking-widest">{currentLanguageName}</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 text-slate-400 transition-transform ${isLangMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {isLangMenuOpen && (
+                  <div className="px-1 pb-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="max-h-60 overflow-y-auto grid grid-cols-2 gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100 no-scrollbar">
+                      {languages.map((lang) => (
+                        <button
+                          key={lang.code}
+                          onClick={() => { setLanguage(lang.code); setIsMenuOpen(false); setIsLangMenuOpen(false); }}
+                          className={`text-[10px] font-bold py-2.5 px-1 rounded-lg border transition-all ${language === lang.code ? 'bg-green-600 border-green-600 text-white shadow-lg shadow-green-600/20' : 'bg-white border-slate-200 text-slate-600 hover:border-green-300'}`}
+                        >
+                          {lang.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="border-t border-slate-100 mt-1 pt-2">
+                  <a 
+                    href="https://forms.gle/YcrerYAazwxi5zXL7" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 w-full p-3 hover:bg-slate-50 rounded-xl transition-colors text-slate-700"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                      </svg>
+                    </div>
+                    <span className="text-xs font-black uppercase tracking-widest">Share Feedback</span>
+                  </a>
+
+                  <button 
+                    onClick={() => { logout(); setIsMenuOpen(false); }}
+                    className="flex items-center gap-3 w-full p-3 hover:bg-red-50 rounded-xl transition-colors text-red-600"
+                  >
+                    <div className="w-8 h-8 bg-red-100 text-red-600 rounded-lg flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                    </div>
+                    <span className="text-xs font-black uppercase tracking-widest">Logout Session</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-50 text-center border-t border-slate-100">
+                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Omega Seiki Mobility Intelligence v1.2</p>
+              </div>
+            </div>
           )}
-          
-          {!showAdminPanel && isAdmin && <FileUpload onFilesStored={handleFilesStored} onError={(msg) => alert(msg)} />}
-          
-          <button onClick={logout} className="text-[10px] font-black bg-red-950/20 text-red-400 border border-red-900/40 px-3 py-1.5 rounded-lg hover:bg-red-600 hover:text-white transition-all uppercase tracking-widest">Logout</button>
         </div>
       </header>
 

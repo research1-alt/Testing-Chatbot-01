@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 
 interface GeminiResponse {
@@ -11,6 +12,25 @@ const languageMap: { [key: string]: string } = {
     'hi-IN': 'Hindi',
     'mr-IN': 'Marathi',
     'ta-IN': 'Tamil',
+    'te-IN': 'Telugu',
+    'bn-IN': 'Bengali',
+    'gu-IN': 'Gujarati',
+    'kn-IN': 'Kannada',
+    'ml-IN': 'Malayalam',
+    'pa-IN': 'Punjabi',
+    'ur-IN': 'Urdu',
+    'as-IN': 'Assamese',
+    'or-IN': 'Odia',
+    'ks-IN': 'Kashmiri',
+    'sd-IN': 'Sindhi',
+    'sa-IN': 'Sanskrit',
+    'kok-IN': 'Konkani',
+    'mni-IN': 'Manipuri',
+    'ne-IN': 'Nepali',
+    'doi-IN': 'Dogri',
+    'mai-IN': 'Maithili',
+    'sat-IN': 'Santali',
+    'brx-IN': 'Bodo',
 };
 
 function cleanJsonResponse(text: string): string {

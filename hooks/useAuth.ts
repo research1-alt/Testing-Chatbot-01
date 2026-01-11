@@ -135,6 +135,11 @@ const useAuth = () => {
     }
   }, [ADMIN_HASH, ADMIN_EMAIL]);
 
+  const checkEmailExists = useCallback((email: string): User | null => {
+    const users = JSON.parse(localStorage.getItem('users') || '[]');
+    return users.find((u: any) => u.email.toLowerCase() === email.toLowerCase()) || null;
+  }, []);
+
   const signup = useCallback(async (credentials: AuthCredentials) => {
     setIsAuthLoading(true);
     setAuthError(null);
@@ -181,14 +186,29 @@ const useAuth = () => {
         users.push(newUser);
         localStorage.setItem('users', JSON.stringify(users));
         
-        // Log to Google Sheet via the new Gateway URL
         await logInternRegistration({
             email: newUser.email,
             mobile: newUser.mobile || '',
             userName: newUser.name || '',
-            emailCode: '' // Sending empty code indicates signup log to the Apps Script
+            emailCode: '' 
         });
 
+        return true;
+    } catch (e) {
+        return false;
+    }
+  }, []);
+
+  const resetPassword = useCallback(async (email: string, newPassword: string): Promise<boolean> => {
+    try {
+        const users = JSON.parse(localStorage.getItem('users') || '[]');
+        const userIndex = users.findIndex((u: any) => u.email.toLowerCase() === email.toLowerCase());
+        
+        if (userIndex === -1) return false;
+
+        const hashedPassword = await hashPassword(newPassword);
+        users[userIndex].password = hashedPassword;
+        localStorage.setItem('users', JSON.stringify(users));
         return true;
     } catch (e) {
         return false;
@@ -207,7 +227,8 @@ const useAuth = () => {
 
   return { 
     user, view, setView, login, finalizeLogin, signup, commitSignup, 
-    logout, authError, isAuthLoading, getAllInterns, deleteIntern 
+    logout, authError, isAuthLoading, getAllInterns, deleteIntern,
+    checkEmailExists, resetPassword
   };
 };
 

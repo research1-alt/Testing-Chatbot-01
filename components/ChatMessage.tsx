@@ -12,12 +12,6 @@ const UserIcon: React.FC = () => (
     <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center font-bold text-sm text-white flex-shrink-0 shadow-sm">U</div>
 );
 
-const BotIcon: React.FC = () => (
-    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor"><path d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h1a1 1 0 011 1v3.5a1.5 1.5 0 01-3 0V9a1 1 0 00-1-1h-1a1 1 0 01-1-1V3.5zM6.5 15.5a1.5 1.5 0 013 0V16a1 1 0 001 1h1a1 1 0 011 1v3.5a1.5 1.5 0 01-3 0V20a1 1 0 00-1-1h-1a1 1 0 01-1-1v-3.5z" /><path d="M4 9.5a1.5 1.5 0 013 0V10a1 1 0 001 1h1a1 1 0 011 1v3.5a1.5 1.5 0 01-3 0V14a1 1 0 00-1-1h-1a1 1 0 01-1-1V9.5z" /><path d="M16.5 3.5a1.5 1.5 0 010 3h-3.5a1.5 1.5 0 010-3h3.5z" /></svg>
-    </div>
-);
-
 const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMessage }) => {
   const isUser = message.sender === 'user';
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -75,7 +69,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
   return (
     <div className={`flex flex-col gap-1 ${isUser ? 'items-end' : 'items-start'}`}>
         <div className={`flex items-start gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
-            {!isUser && <BotIcon />}
             <div className={`rounded-2xl p-4 max-w-[90%] sm:max-w-lg break-words group relative shadow-md transition-all ${isUser ? 'bg-green-600 rounded-br-none text-white' : 'bg-white text-gray-800 rounded-bl-none border border-gray-100'}`}>
                 {message.videoUrl && <video src={message.videoUrl} controls className="mb-4 rounded-xl max-w-full h-auto bg-black shadow-inner" />}
                 <div className="whitespace-pre-wrap text-[15px] leading-[1.6] tracking-tight">
@@ -106,7 +99,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
             {isUser && <UserIcon />}
         </div>
         {!isUser && (message.suggestions || message.unclear) && (
-            <div className="flex flex-wrap gap-2 ml-11 max-w-lg mt-2">
+            <div className="flex flex-wrap gap-2 ml-4 max-w-lg mt-2">
                 {message.unclear && <button onClick={() => onSendMessage("Explain in simpler steps.")} className="text-[11px] font-bold bg-white border text-gray-500 py-1.5 px-4 rounded-full hover:bg-gray-50 transition-colors shadow-sm">SIMPLIFY</button>}
                 {message.suggestions?.map((s, i) => <button key={i} onClick={() => onSendMessage(s)} className="text-[11px] font-bold bg-blue-50 border border-blue-100 text-blue-700 py-1.5 px-4 rounded-full hover:bg-blue-100 transition-colors shadow-sm uppercase tracking-wide">{s}</button>)}
             </div>
