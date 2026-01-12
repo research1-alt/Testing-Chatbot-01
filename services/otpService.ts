@@ -1,8 +1,9 @@
+
 /**
  * OTP Service & Registration Gateway
  * Handles communication with Google Apps Script for email delivery and spreadsheet logging.
  * 
- * Target Spreadsheet: https://docs.google.com/spreadsheets/d/1VAxeaMJz_epaw1o0Q-WCnB9-on3-i5ySbmALevZigW8/
+ * Target Spreadsheet: https://docs.google.com/spreadsheets/d/1xItnaIxqCiXgP3IOuWxVZlVGRD543WV1IU2r67PEl3w/
  */
 
 export interface OtpDeliveryPayload {

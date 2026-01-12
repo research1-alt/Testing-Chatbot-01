@@ -1,11 +1,61 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage as ChatMessageType } from '../types';
+import { generateSpeech } from '../services/geminiService';
 
 interface ChatMessageProps {
   message: ChatMessageType;
   language: string;
   onSendMessage: (message: string) => void;
+}
+
+/**
+ * Robustly converts various Google Drive link formats to a direct, renderable image source.
+ */
+const getDirectImageUrl = (url: string) => {
+  if (!url) return '';
+  const trimmed = url.trim();
+  
+  if (trimmed.includes('drive.google.com')) {
+    let id = '';
+    const dMatch = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (dMatch) id = dMatch[1];
+    if (!id) {
+        const idMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+        if (idMatch) id = idMatch[1];
+    }
+    if (id) return `https://lh3.googleusercontent.com/d/${id}`;
+  }
+  return trimmed;
+};
+
+function decodeBase64(base64: string) {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function decodeAudioData(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number,
+  numChannels: number,
+): Promise<AudioBuffer> {
+  const dataInt16 = new Int16Array(data.buffer);
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
+  }
+  return buffer;
 }
 
 const UserIcon: React.FC = () => (
@@ -16,92 +66,211 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
   const isUser = message.sender === 'user';
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const utteranceRef = React.useRef<SpeechSynthesisUtterance | null>(null);
+  const [isAudioLoading, setIsAudioLoading] = useState(false);
+  
+  // Lightbox & Zoom State
+  const [zoomedImage, setZoomedImage] = useState<{url: string, alt: string} | null>(null);
+  const [zoomScale, setZoomScale] = useState(1);
+  
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
 
-  /**
-   * Cleans text for Speech Synthesis.
-   * Strips markdown and technical prefixes for a natural "voice manual" feel.
-   */
-  const cleanTextForSpeech = (text: string) => {
-    return text
-      .replace(/\*\*/g, '') 
-      .replace(/#/g, '')     
-      .replace(/Step \d+:/gi, '') 
-      .replace(/[-*]\s/g, ' ') 
-      .replace(/[\[\]\(\)\/]/g, ' ') 
-      .replace(/[`_~>]/g, '') 
-      .replace(/\s+/g, ' ') 
-      .trim();
+  const formatText = (text: string) => {
+    const mdRegex = /(!\[.*?\]\(.*?\))/g;
+    const driveRegex = /(https?:\/\/drive\.google\.com\/[^\s\n)]+)/g;
+
+    const imageParts: React.ReactNode[] = [];
+    let processedText = text;
+    
+    // Extract markdown images
+    const mdMatches = text.match(mdRegex);
+    if (mdMatches) {
+        mdMatches.forEach((match, idx) => {
+            const inner = match.match(/!\[(.*?)\]\((.*?)\)/);
+            if (inner) {
+                imageParts.push(renderImage(inner[1] || "Technical Diagram", inner[2], `md-${idx}`));
+                processedText = processedText.replace(match, ''); 
+            }
+        });
+    }
+
+    // Sniff for raw drive links not in markdown
+    const driveMatches = processedText.match(driveRegex);
+    if (driveMatches) {
+        driveMatches.forEach((match, idx) => {
+            imageParts.push(renderImage("OSM Technical Schematic", match, `raw-${idx}`));
+            processedText = processedText.replace(match, '');
+        });
+    }
+
+    const parts = processedText.split(/(Step \d+:|\*\*.*?\*\*)/g);
+    const contentNodes: React.ReactNode[] = parts.map((part, index) => {
+        if (!part || !part.trim()) return null;
+        if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={index} className="font-bold text-gray-900 bg-yellow-100 px-1 rounded">{part.slice(2, -2)}</strong>;
+        } else if (/Step \d+:/.test(part)) {
+            return <span key={index} className="block mt-4 mb-2 text-blue-700 font-black uppercase text-[12px] tracking-wider border-b border-blue-50 pb-1">{part}</span>;
+        }
+        return <span key={index}>{part}</span>;
+    });
+
+    return (
+      <>
+        {imageParts}
+        <div className="message-content-text leading-relaxed">
+          {contentNodes}
+        </div>
+      </>
+    );
   };
 
-  useEffect(() => {
-    const cleanedText = cleanTextForSpeech(message.text);
-    const utterance = new SpeechSynthesisUtterance(cleanedText);
-    utterance.lang = language;
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utteranceRef.current = utterance;
-    return () => speechSynthesis.cancel();
-  }, [message.text, language]);
+  const renderImage = (alt: string, url: string, key: string) => {
+    const directUrl = getDirectImageUrl(url);
+    return (
+        <div key={key} className="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+            <div className="px-4 py-2 bg-slate-900 text-[10px] font-black text-white uppercase tracking-widest flex justify-between items-center">
+                <span>{alt}</span>
+                <span className="text-green-400">TOUCH TO ZOOM</span>
+            </div>
+            <div className="bg-slate-50 p-2 text-center overflow-hidden">
+                <img 
+                    src={directUrl} 
+                    alt={alt} 
+                    className="w-full h-auto max-h-[400px] object-contain block mx-auto rounded-lg cursor-zoom-in hover:scale-[1.02] transition-transform duration-300 active:scale-95" 
+                    onClick={() => {
+                        setZoomedImage({ url: directUrl, alt });
+                        setZoomScale(1);
+                    }}
+                    onError={(e) => {
+                        const target = e.currentTarget;
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
+                        if (parent) {
+                          parent.innerHTML = `
+                            <div class="p-6 text-center">
+                              <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Diagram failed to render</p>
+                              <a href="${url}" target="_blank" class="text-[10px] font-black text-blue-600 underline uppercase tracking-widest">Open in Google Drive</a>
+                            </div>
+                          `;
+                        }
+                    }}
+                />
+            </div>
+        </div>
+    );
+  };
+
+  const handlePlayAudio = async () => {
+    if (isSpeaking) {
+      sourceRef.current?.stop();
+      setIsSpeaking(false);
+      return;
+    }
+    setIsAudioLoading(true);
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      }
+      const cleanText = message.text.replace(/!\[.*?\]\(.*?\)/g, '').replace(/(https?:\/\/drive\.google\.com\/[^\s\n)]+)/g, '');
+      const base64Audio = await generateSpeech(cleanText, language);
+      const audioBytes = decodeBase64(base64Audio);
+      const buffer = await decodeAudioData(audioBytes, audioContextRef.current, 24000, 1);
+      const source = audioContextRef.current.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audioContextRef.current.destination);
+      source.onended = () => setIsSpeaking(false);
+      source.start();
+      sourceRef.current = source;
+      setIsSpeaking(true);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsAudioLoading(false);
+    }
+  };
 
   const handleCopy = () => {
-      navigator.clipboard.writeText(message.text);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2000);
-  };
-
-  /**
-   * UI Formatter for bolding and structure.
-   */
-  const formatText = (text: string) => {
-    const parts = text.split(/(\*\*.*?\*\*|Step \d+:)/g);
-    return parts.map((part, index) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={index} className="font-bold text-gray-900 bg-yellow-100/50 px-1 rounded">{part.slice(2, -2)}</strong>;
-      }
-      if (/Step \d+:/.test(part)) {
-        return <span key={index} className="block mt-4 first:mt-0 mb-1 text-blue-700 font-black uppercase text-[12px] tracking-wider">{part}</span>;
-      }
-      return part;
-    });
+    navigator.clipboard.writeText(message.text);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
   };
 
   return (
     <div className={`flex flex-col gap-1 ${isUser ? 'items-end' : 'items-start'}`}>
-        <div className={`flex items-start gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
-            <div className={`rounded-2xl p-4 max-w-[90%] sm:max-w-lg break-words group relative shadow-md transition-all ${isUser ? 'bg-green-600 rounded-br-none text-white' : 'bg-white text-gray-800 rounded-bl-none border border-gray-100'}`}>
-                {message.videoUrl && <video src={message.videoUrl} controls className="mb-4 rounded-xl max-w-full h-auto bg-black shadow-inner" />}
-                <div className="whitespace-pre-wrap text-[15px] leading-[1.6] tracking-tight">
+        <div className={`flex items-start gap-3 ${isUser ? 'justify-end' : 'justify-start'} w-full`}>
+            {!isUser && <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center font-bold text-xs text-white flex-shrink-0 shadow-md">OSM</div>}
+            <div className={`rounded-3xl p-5 max-w-[90%] sm:max-w-xl group relative shadow-lg transition-all ${isUser ? 'bg-green-600 text-white rounded-br-none' : 'bg-white text-gray-800 border border-slate-100 rounded-bl-none'}`}>
+                <div className="whitespace-pre-wrap text-[14px] leading-[1.6]">
                   {formatText(message.text)}
                 </div>
-                <div className={`text-[10px] mt-3 font-bold tracking-wider flex justify-between items-center ${isUser ? 'text-green-100' : 'text-gray-400'}`}>
+                <div className={`text-[9px] mt-4 font-bold flex justify-between items-center ${isUser ? 'text-green-100' : 'text-slate-400'}`}>
                     <span className="uppercase">{message.timestamp}</span>
                     {!isUser && (
-                        <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity ml-4">
-                            <button onClick={handleCopy} className="hover:text-blue-600 transition-colors">
-                                {isCopied ? 'COPIED' : 'COPY'}
-                            </button>
+                        <div className="flex gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={handleCopy} className="hover:text-blue-600 transition-colors uppercase">{isCopied ? 'COPIED' : 'COPY'}</button>
+                            <button onClick={handlePlayAudio} className="hover:text-blue-600 transition-colors uppercase">{isAudioLoading ? '...' : isSpeaking ? 'STOP' : 'PLAY'}</button>
                         </div>
                     )}
                 </div>
-                {!isUser && message.id !== 'initial-bot-message' && !message.id.startsWith('system-') && (
-                    <button 
-                        onClick={() => isSpeaking ? (speechSynthesis.cancel(), setIsSpeaking(false)) : (speechSynthesis.cancel(), speechSynthesis.speak(utteranceRef.current!))} 
-                        className="absolute -top-3 -right-3 p-2 rounded-full bg-white hover:bg-gray-50 text-blue-600 opacity-0 group-hover:opacity-100 transition-all shadow-lg border border-gray-100 z-10"
-                        title="Listen to Steps"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isSpeaking ? 'animate-pulse' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9 9 0 0119 10a9 9 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7 7 0 0017 10a7 7 0 00-2.343-5.657 1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5 5 0 0115 10a5 5 0 01-1.757 3.536 1 1 0 01-1.415-1.415A3 3 0 0013 10a3 3 0 00-1.172-2.424 1 1 0 010-1.415z" clipRule="evenodd" />
-                        </svg>
-                    </button>
-                )}
             </div>
             {isUser && <UserIcon />}
         </div>
-        {!isUser && (message.suggestions || message.unclear) && (
-            <div className="flex flex-wrap gap-2 ml-4 max-w-lg mt-2">
-                {message.unclear && <button onClick={() => onSendMessage("Explain in simpler steps.")} className="text-[11px] font-bold bg-white border text-gray-500 py-1.5 px-4 rounded-full hover:bg-gray-50 transition-colors shadow-sm">SIMPLIFY</button>}
-                {message.suggestions?.map((s, i) => <button key={i} onClick={() => onSendMessage(s)} className="text-[11px] font-bold bg-blue-50 border border-blue-100 text-blue-700 py-1.5 px-4 rounded-full hover:bg-blue-100 transition-colors shadow-sm uppercase tracking-wide">{s}</button>)}
+        {!isUser && message.suggestions && (
+            <div className="flex flex-wrap gap-2 ml-11 mt-2">
+                {message.suggestions.map((s, i) => <button key={i} onClick={() => onSendMessage(s)} className="text-[10px] font-black bg-slate-100 text-slate-600 py-1.5 px-4 rounded-full hover:bg-slate-200 transition-all uppercase tracking-widest">{s}</button>)}
+            </div>
+        )}
+
+        {/* Zoom Lightbox Modal */}
+        {zoomedImage && (
+            <div className="fixed inset-0 z-[100] bg-slate-900/95 flex flex-col items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200">
+                <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center bg-gradient-to-b from-slate-900/50 to-transparent">
+                    <div className="flex flex-col">
+                        <span className="text-[10px] font-black text-green-400 uppercase tracking-widest mb-1">Diagram Preview</span>
+                        <h4 className="text-white font-black text-sm uppercase tracking-tight">{zoomedImage.alt}</h4>
+                    </div>
+                    <button 
+                        onClick={() => setZoomedImage(null)} 
+                        className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-all backdrop-blur-lg border border-white/10"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+
+                <div className="flex-1 w-full flex items-center justify-center overflow-auto p-4 cursor-default no-scrollbar">
+                    <div className="relative transition-transform duration-200 ease-out flex items-center justify-center min-h-full min-w-full" style={{ transform: `scale(${zoomScale})` }}>
+                        <img 
+                            src={zoomedImage.url} 
+                            alt={zoomedImage.alt} 
+                            className="max-w-full max-h-[80vh] shadow-2xl rounded-lg object-contain"
+                            draggable={false}
+                        />
+                    </div>
+                </div>
+
+                <div className="absolute bottom-10 flex gap-4 bg-white/10 p-2 rounded-2xl backdrop-blur-xl border border-white/10 shadow-2xl">
+                    <button 
+                        onClick={() => setZoomScale(prev => Math.max(0.5, prev - 0.25))}
+                        className="w-12 h-12 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all active:scale-90"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M20 12H4" /></svg>
+                    </button>
+                    <div className="flex items-center justify-center px-4 font-black text-white text-xs min-w-[60px] uppercase tracking-widest">
+                        {Math.round(zoomScale * 100)}%
+                    </div>
+                    <button 
+                        onClick={() => setZoomScale(prev => Math.min(4, prev + 0.25))}
+                        className="w-12 h-12 flex items-center justify-center rounded-xl bg-green-500 hover:bg-green-400 text-white transition-all shadow-lg active:scale-90"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
+                    </button>
+                    <button 
+                        onClick={() => setZoomScale(1)}
+                        className="px-6 h-12 flex items-center justify-center rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-black text-[10px] uppercase tracking-widest transition-all active:scale-90"
+                    >
+                        Reset
+                    </button>
+                </div>
             </div>
         )}
     </div>

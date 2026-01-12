@@ -1,3 +1,4 @@
+
 import { StoredFile } from './utils/db';
 
 const osmTechnicalManualContent = `
@@ -9,7 +10,6 @@ const osmTechnicalManualContent = `
 - **Pin 87a:** 12V Supply to Cluster Relay at Pin no 87a only Charging time. (Wire: Yellow)
 - **Pin 86:** 12V Supply From Ignition Switch (I02). (Wire: Yellow/Red)
 - **Pin 85:** Common Ground. (Wire: Black)
-- **Image Description:** A 5-pin relay diagram labeled RDC_Output. Show Yellow/Black wire at Pin 30, Yellow wire at Pin 87, and Yellow/Red at Pin 86. Pin 85 is connected to ground.
 
 ## 2. Vehicle Start Sequence (MATEL)
 - **Ignition Step 1:** Only Battery is getting ON.

@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, Modality } from "@google/genai";
 
 interface GeminiResponse {
     answer: string;
@@ -39,11 +39,10 @@ function cleanJsonResponse(text: string): string {
 
 /**
  * Technical Chatbot Intelligence
- * Uses RAG (Retrieval Augmented Generation) to answer based on admin-uploaded manuals.
  */
 export async function getChatbotResponse(
     query: string, 
-    fileContent: string | null,
+    context: string | null,
     chatHistory: string,
     language: string,
 ): Promise<{ answer: string, suggestions: string[], isUnclear: boolean }> {
@@ -52,31 +51,30 @@ export async function getChatbotResponse(
     const languageName = languageMap[language] || 'English';
     
     const systemInstruction = `You are the "OSM Technical Intelligence Hub". 
-    You assist field service interns in troubleshooting Omega Seiki Mobility (OSM) electric vehicles.
+    Your primary goal is to help field interns troubleshoot OSM vehicles using data from the MASTER DATABASE CSV provided in the context.
 
-    STRICT OPERATING PROCEDURES:
-    1. **KNOWLEDGE BASE**: You MUST prioritize the [TECHNICAL MANUALS] provided below. This is the official source of truth.
-    2. **TECHNICAL PRECISION**: Mention specific relay pin numbers (30, 85, 86, 87), wire colors (e.g., Pink/Yellow), and fuse ratings (e.g., 15A).
-    3. **RESPONSE STYLE**: 
-       - Use numbered steps for troubleshooting.
-       - Use **BOLD** for parts, tools, and wire colors.
-       - Keep sentences short for easy reading on mobile screens in the field.
-    4. **SAFETY FIRST**: Always advise the intern to disconnect the high-voltage battery before testing high-current circuits.
-    5. **LANGUAGE**: Provide the response in ${languageName}.
+    DIAGRAM RETRIEVAL PROTOCOL:
+    1. Scan the text provided under [OSM MASTER DATABASE - CSV].
+    2. Match the user's query against the "Diagram" column (component name).
+    3. If a match is found, you MUST start your response with the diagram image in Markdown: ![Component Name](Google Drive URL)
+    4. Follow the image with concise technical instructions in ${languageName}.
+    5. Be specific about pin numbers (e.g., 30, 85, 86, 87) and wire colors.
 
-    OUTPUT SCHEMA (JSON):
-    - 'answer': The step-by-step solution.
-    - 'suggestions': 2-3 logical next steps or related components.
-    - 'isUnclear': true if the query is too vague to map to a circuit.`;
+    IMPORTANT:
+    - If the user asks for a relay, show the relay diagram first.
+    - If the user asks for a fuse box, show the fuse layout first.
+    - Always use the URL provided in the CSV. Do not invent links.
+    - If a diagram is found, do NOT suggest opening the URL, the app handles zooming.
 
-    const manualsContext = fileContent 
-        ? `[TECHNICAL MANUALS]\n${fileContent}\n\n`
-        : `[WARNING: NO MANUALS LOADED. USING GENERAL OSM REPAIR KNOWLEDGE.]\n\n`;
+    RESPONSE SCHEMA (JSON):
+    - 'answer': String containing the image Markdown and instructions.
+    - 'suggestions': Next logical questions.
+    - 'isUnclear': Only true if the part is not in the CSV or manuals.`;
 
-    const fullPrompt = `${manualsContext}CHAT HISTORY:\n${chatHistory}\n\nCURRENT INTERN QUERY: "${query}"`;
+    const fullPrompt = `${context}\n\nCHAT HISTORY:\n${chatHistory}\n\nINTERN QUERY: "${query}"`;
   
     const response = await ai.models.generateContent({
-        model: "gemini-3-pro-preview",
+        model: 'gemini-3-pro-preview',
         contents: [{ parts: [{ text: fullPrompt }] }],
         config: {
             systemInstruction,
@@ -97,41 +95,29 @@ export async function getChatbotResponse(
     return data;
   } catch (error: any) {
     console.error("Intelligence Hub Error:", error);
-    throw new Error(`Technical Analysis Failed: ${error.message}`);
+    throw new Error(`Analysis Failed: ${error.message}`);
   }
 }
 
-/**
- * Generates technical videos for visualization using Veo.
- */
-export async function generateVideo(
-    base64Image: string,
-    mimeType: string,
-    prompt: string,
-    aspectRatio: '16:9' | '9:16'
-): Promise<{ videoUrl: string, error?: string }> {
-    try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        let operation = await ai.models.generateVideos({
-            model: 'veo-3.1-fast-generate-preview',
-            prompt: prompt,
-            image: { imageBytes: base64Image, mimeType: mimeType },
-            config: { numberOfVideos: 1, resolution: '720p', aspectRatio }
-        });
+export async function generateSpeech(text: string, language: string): Promise<string> {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const languageName = languageMap[language] || 'English';
+    const cleanText = text.replace(/!\[.*?\]\(.*?\)/g, '');
 
-        while (!operation.done) {
-            await new Promise(resolve => setTimeout(resolve, 10000));
-            operation = await ai.operations.getVideosOperation({ operation });
-        }
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-preview-tts',
+        contents: [{ parts: [{ text: `Speak in ${languageName}: ${cleanText}` }] }],
+        config: {
+            responseModalities: [Modality.AUDIO],
+            speechConfig: {
+                voiceConfig: {
+                    prebuiltVoiceConfig: { voiceName: 'Kore' },
+                },
+            },
+        },
+    });
 
-        const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-        if (downloadLink) {
-            const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
-            const blob = await response.blob();
-            return { videoUrl: URL.createObjectURL(blob) };
-        }
-        return { videoUrl: '', error: 'Video generated but stream unavailable.' };
-    } catch (error: any) {
-        return { videoUrl: '', error: error.message };
-    }
+    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (!base64Audio) throw new Error("Audio generation failed");
+    return base64Audio;
 }
