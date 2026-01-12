@@ -1,11 +1,10 @@
 
-const CACHE_NAME = 'osm-v3';
+const CACHE_NAME = 'osm-v4';
 const ASSETS = [
   '/',
   '/index.html',
   '/index.css',
-  '/manifest.json',
-  'https://ik.imagekit.io/m8gcj8knd/omega.png?v=1'
+  '/manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
@@ -31,6 +30,8 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
   // Navigation requests: always return index.html for the SPA
   if (event.request.mode === 'navigate') {
     event.respondWith(
@@ -41,9 +42,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Strategy: Cache First for assets, Network First for others
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+      return fetch(event.request).then((networkResponse) => {
+        // Cache images from ImageKit dynamically
+        if (url.hostname === 'ik.imagekit.io' && networkResponse.ok) {
+           const responseToCache = networkResponse.clone();
+           caches.open(CACHE_NAME).then((cache) => {
+             cache.put(event.request, responseToCache);
+           });
+        }
+        return networkResponse;
+      });
     })
   );
 });

@@ -18,43 +18,43 @@
   "prefer_related_applications": false,
   "icons": [
     {
-      "src": "https://ik.imagekit.io/m8gcj8knd/omega.png?v=1",
+      "src": "https://ik.imagekit.io/m8gcj8knd/tr:w-144,h-144,f-png/omega.png?v=2",
       "sizes": "144x144",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://ik.imagekit.io/m8gcj8knd/omega.png?v=1",
+      "src": "https://ik.imagekit.io/m8gcj8knd/tr:w-152,h-152,f-png/omega.png?v=2",
       "sizes": "152x152",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://ik.imagekit.io/m8gcj8knd/omega.png?v=1",
+      "src": "https://ik.imagekit.io/m8gcj8knd/tr:w-192,h-192,f-png/omega.png?v=2",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://ik.imagekit.io/m8gcj8knd/omega.png?v=1",
+      "src": "https://ik.imagekit.io/m8gcj8knd/tr:w-384,h-384,f-png/omega.png?v=2",
       "sizes": "384x384",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://ik.imagekit.io/m8gcj8knd/omega.png?v=1",
+      "src": "https://ik.imagekit.io/m8gcj8knd/tr:w-512,h-512,f-png/omega.png?v=2",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://ik.imagekit.io/m8gcj8knd/omega.png?v=1",
+      "src": "https://ik.imagekit.io/m8gcj8knd/tr:w-512,h-512,f-png/omega.png?v=2",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "https://ik.imagekit.io/m8gcj8knd/omega.png?v=1",
+      "src": "https://ik.imagekit.io/m8gcj8knd/tr:w-1024,h-1024,f-png/omega.png?v=2",
       "sizes": "1024x1024",
       "type": "image/png",
       "purpose": "any"
