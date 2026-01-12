@@ -5,6 +5,7 @@ import IntroPage from './components/IntroPage';
 import AuthPage from './components/AuthPage';
 import FileUpload from './components/FileUpload';
 import AdminDashboard from './components/AdminDashboard';
+import InstallPrompt from './components/InstallPrompt';
 import { ChatMessage } from './types';
 import { getChatbotResponse } from './services/geminiService';
 import { addFile, getAllFiles, StoredFile, deleteFile } from './utils/db';
@@ -37,7 +38,6 @@ const App: React.FC = () => {
     checkEmailExists, resetPassword
   } = useAuth();
   
-  // Requirement: messages is strictly in-memory
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatSessionKey, setChatSessionKey] = useState(0); 
   const [isLoading, setIsLoading] = useState(false);
@@ -52,6 +52,10 @@ const App: React.FC = () => {
   const [isLangSelectorOpen, setIsLangSelectorOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
 
+  // PWA Install Prompt State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+
   const isAdmin = user?.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
   const getInitialMessage = useCallback((): ChatMessage => ({
@@ -62,19 +66,39 @@ const App: React.FC = () => {
     suggestions: ["Relay Diagram", "Fuse Box Layout", "MCU Power Flow"]
   }), [chatSessionKey]);
 
-  /**
-   * handleReloadApp:
-   * Performs a "Soft Reload" by purging state and incrementing session key.
-   * This ensures a fresh chat window without browser-level failure risks.
-   */
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      // Stash the event so it can be triggered later.
+      setDeferredPrompt(e);
+      // Show our custom install banner
+      setShowInstallPrompt(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    // Show the browser's install prompt
+    deferredPrompt.prompt();
+    // Wait for the user to respond to the prompt
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`User response to the install prompt: ${outcome}`);
+    // We've used the prompt, and can't use it again, so clear it
+    setDeferredPrompt(null);
+    setShowInstallPrompt(false);
+  };
+
   const handleReloadApp = useCallback(() => {
     setIsRefreshing(true);
     setIsSidebarOpen(false);
-    
-    // Clear everything
     setMessages([]);
-    
-    // Short delay to allow React to unmount the old component via key change
     setTimeout(() => {
         setChatSessionKey(prev => prev + 1);
         setIsRefreshing(false);
@@ -135,7 +159,6 @@ const App: React.FC = () => {
     }
   }, [view, loadKnowledgeBase, fetchMasterSheet]);
 
-  // Handle re-initialization after reload/refresh
   useEffect(() => {
     if (view === 'chat' && !isRefreshing) {
         setMessages([getInitialMessage()]);
@@ -217,6 +240,15 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen max-w-5xl mx-auto border-x bg-gray-50 shadow-2xl overflow-hidden font-sans text-slate-900 relative">
+      
+      {/* Install Prompt Banner */}
+      {showInstallPrompt && (
+        <InstallPrompt 
+          onInstall={handleInstallClick} 
+          onDismiss={() => setShowInstallPrompt(false)} 
+        />
+      )}
+
       {/* System Reset Overlay */}
       {isRefreshing && (
         <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center text-white animate-in fade-in duration-300">
@@ -316,7 +348,6 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-3">
-            {/* Header Refresh Button - Primary Action */}
             {!showAdminPanel && (
               <button 
                 onClick={handleReloadApp}
