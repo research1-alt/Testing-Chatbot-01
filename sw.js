@@ -1,17 +1,20 @@
 
-const CACHE_NAME = 'osm-v5';
+const CACHE_NAME = 'osm-v6';
 const ASSETS = [
   '/',
   '/index.html',
   '/index.css',
   '/manifest.json',
-  'https://ik.imagekit.io/m8gcj8knd/omega.png?tr=w-192,h-192,f-png',
-  'https://ik.imagekit.io/m8gcj8knd/omega.png?tr=w-512,h-512,f-png'
+  'https://ik.imagekit.io/m8gcj8knd/tr:w-192,h-192,f-png/omega.png',
+  'https://ik.imagekit.io/m8gcj8knd/tr:w-512,h-512,f-png/omega.png'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME).then((cache) => {
+      console.log('SW: Pre-caching critical assets');
+      return cache.addAll(ASSETS);
+    })
   );
   self.skipWaiting();
 });
@@ -22,6 +25,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
+            console.log('SW: Removing old cache', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -49,6 +53,7 @@ self.addEventListener('fetch', (event) => {
         return cachedResponse;
       }
       return fetch(event.request).then((networkResponse) => {
+        // Cache external ImageKit assets if they are successful
         if (url.hostname === 'ik.imagekit.io' && networkResponse.ok) {
            const responseToCache = networkResponse.clone();
            caches.open(CACHE_NAME).then((cache) => {
