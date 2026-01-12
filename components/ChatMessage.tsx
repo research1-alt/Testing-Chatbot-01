@@ -201,6 +201,11 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
     }
   };
 
+  const closeZoom = () => {
+    setZoomedImage(null);
+    setZoomScale(1);
+  };
+
   return (
     <div className={`flex flex-col gap-1 ${isUser ? 'items-end' : 'items-start'}`}>
         <div className={`flex items-start gap-3 ${isUser ? 'justify-end' : 'justify-start'} w-full`}>
@@ -247,21 +252,26 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
 
         {/* Zoom Lightbox Modal */}
         {zoomedImage && (
-            <div className="fixed inset-0 z-[100] bg-slate-900/95 flex flex-col items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200">
-                <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center bg-gradient-to-b from-slate-900/50 to-transparent">
+            <div 
+                className="fixed inset-0 z-[100] bg-slate-900/95 flex flex-col items-center justify-center backdrop-blur-md animate-in fade-in duration-200"
+                onClick={closeZoom}
+            >
+                {/* Header with Close Action - High Z-Index to stay on top */}
+                <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center bg-gradient-to-b from-slate-900/80 to-transparent z-[110]" onClick={(e) => e.stopPropagation()}>
                     <div className="flex flex-col">
                         <span className="text-[10px] font-black text-green-400 uppercase tracking-widest mb-1">Diagram Preview</span>
                         <h4 className="text-white font-black text-sm uppercase tracking-tight">{zoomedImage.alt}</h4>
                     </div>
                     <button 
-                        onClick={() => setZoomedImage(null)} 
-                        className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-all backdrop-blur-lg border border-white/10"
+                        onClick={closeZoom} 
+                        className="w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-all backdrop-blur-lg border border-white/20 shadow-2xl active:scale-90"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                 </div>
 
-                <div className="flex-1 w-full flex items-center justify-center overflow-auto p-4 cursor-default no-scrollbar">
+                {/* Content Area */}
+                <div className="flex-1 w-full flex items-center justify-center overflow-auto p-4 cursor-default no-scrollbar" onClick={(e) => e.stopPropagation()}>
                     <div className="relative transition-transform duration-200 ease-out flex items-center justify-center min-h-full min-w-full" style={{ transform: `scale(${zoomScale})` }}>
                         <img 
                             src={zoomedImage.url} 
@@ -272,25 +282,26 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
                     </div>
                 </div>
 
-                <div className="absolute bottom-10 flex gap-4 bg-white/10 p-2 rounded-2xl backdrop-blur-xl border border-white/10 shadow-2xl">
+                {/* Footer Controls */}
+                <div className="absolute bottom-10 flex gap-4 bg-slate-800/80 p-3 rounded-3xl backdrop-blur-2xl border border-white/10 shadow-2xl z-[110]" onClick={(e) => e.stopPropagation()}>
                     <button 
                         onClick={() => setZoomScale(prev => Math.max(0.5, prev - 0.25))}
-                        className="w-12 h-12 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all active:scale-90"
+                        className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white/5 hover:bg-white/10 text-white transition-all active:scale-90"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M20 12H4" /></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M20 12H4" /></svg>
                     </button>
                     <div className="flex items-center justify-center px-4 font-black text-white text-xs min-w-[60px] uppercase tracking-widest">
                         {Math.round(zoomScale * 100)}%
                     </div>
                     <button 
                         onClick={() => setZoomScale(prev => Math.min(4, prev + 0.25))}
-                        className="w-12 h-12 flex items-center justify-center rounded-xl bg-green-500 hover:bg-green-400 text-white transition-all shadow-lg active:scale-90"
+                        className="w-12 h-12 flex items-center justify-center rounded-2xl bg-green-600 hover:bg-green-500 text-white transition-all shadow-lg active:scale-90"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
                     </button>
                     <button 
                         onClick={() => setZoomScale(1)}
-                        className="px-6 h-12 flex items-center justify-center rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-black text-[10px] uppercase tracking-widest transition-all active:scale-90"
+                        className="px-6 h-12 flex items-center justify-center rounded-2xl bg-slate-700 hover:bg-slate-600 text-white font-black text-[10px] uppercase tracking-widest transition-all active:scale-90"
                     >
                         Reset
                     </button>
