@@ -1,9 +1,11 @@
-const CACHE_NAME = 'osm-v2';
+
+const CACHE_NAME = 'osm-v3';
 const ASSETS = [
   '/',
   '/index.html',
   '/index.css',
-  '/manifest.json'
+  '/manifest.json',
+  'https://ik.imagekit.io/m8gcj8knd/omega.png?v=1'
 ];
 
 self.addEventListener('install', (event) => {
