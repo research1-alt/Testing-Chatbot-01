@@ -65,7 +65,6 @@ const UserIcon: React.FC = () => (
 const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMessage }) => {
   const isUser = message.sender === 'user';
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isCopied, setIsCopied] = useState(false);
   const [isAudioLoading, setIsAudioLoading] = useState(false);
   
   // Lightbox & Zoom State
@@ -162,19 +161,31 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
 
   const handlePlayAudio = async () => {
     if (isSpeaking) {
-      sourceRef.current?.stop();
+      if (sourceRef.current) {
+          try { sourceRef.current.stop(); } catch(e) {}
+      }
       setIsSpeaking(false);
       return;
     }
+    
     setIsAudioLoading(true);
     try {
+      // Resume audio context if suspended (common browser restriction)
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      } else if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume();
       }
-      const cleanText = message.text.replace(/!\[.*?\]\(.*?\)/g, '').replace(/(https?:\/\/drive\.google\.com\/[^\s\n)]+)/g, '');
-      const base64Audio = await generateSpeech(cleanText, language);
+
+      const base64Audio = await generateSpeech(message.text, language);
+      if (!base64Audio) {
+          setIsAudioLoading(false);
+          return;
+      }
+
       const audioBytes = decodeBase64(base64Audio);
       const buffer = await decodeAudioData(audioBytes, audioContextRef.current, 24000, 1);
+      
       const source = audioContextRef.current.createBufferSource();
       source.buffer = buffer;
       source.connect(audioContextRef.current.destination);
@@ -183,16 +194,11 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
       sourceRef.current = source;
       setIsSpeaking(true);
     } catch (err) {
-      console.error(err);
+      console.error("Audio playback error:", err);
+      setIsSpeaking(false);
     } finally {
       setIsAudioLoading(false);
     }
-  };
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(message.text);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
   };
 
   return (
@@ -207,8 +213,26 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
                     <span className="uppercase">{message.timestamp}</span>
                     {!isUser && (
                         <div className="flex gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={handleCopy} className="hover:text-blue-600 transition-colors uppercase">{isCopied ? 'COPIED' : 'COPY'}</button>
-                            <button onClick={handlePlayAudio} className="hover:text-blue-600 transition-colors uppercase">{isAudioLoading ? '...' : isSpeaking ? 'STOP' : 'PLAY'}</button>
+                            <button 
+                              onClick={handlePlayAudio} 
+                              className={`transition-all p-1 rounded-full ${isSpeaking ? 'text-green-600 bg-green-50' : 'text-slate-400 hover:text-blue-600 hover:bg-slate-100'} ${isAudioLoading ? 'animate-pulse' : ''}`}
+                              title={isSpeaking ? "Stop Voice" : "Listen to instructions"}
+                            >
+                                {isAudioLoading ? (
+                                  <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                ) : isSpeaking ? (
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                ) : (
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                                  </svg>
+                                )}
+                            </button>
                         </div>
                     )}
                 </div>

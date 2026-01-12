@@ -21,16 +21,6 @@ const languageMap: { [key: string]: string } = {
     'ur-IN': 'Urdu',
     'as-IN': 'Assamese',
     'or-IN': 'Odia',
-    'ks-IN': 'Kashmiri',
-    'sd-IN': 'Sindhi',
-    'sa-IN': 'Sanskrit',
-    'kok-IN': 'Konkani',
-    'mni-IN': 'Manipuri',
-    'ne-IN': 'Nepali',
-    'doi-IN': 'Dogri',
-    'mai-IN': 'Maithili',
-    'sat-IN': 'Santali',
-    'brx-IN': 'Bodo',
 };
 
 function cleanJsonResponse(text: string): string {
@@ -38,7 +28,7 @@ function cleanJsonResponse(text: string): string {
 }
 
 /**
- * Technical Chatbot Intelligence
+ * Technical Chatbot Intelligence - Specialized for OSM Field Service
  */
 export async function getChatbotResponse(
     query: string, 
@@ -50,28 +40,21 @@ export async function getChatbotResponse(
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const languageName = languageMap[language] || 'English';
     
-    const systemInstruction = `You are the "OSM Technical Intelligence Hub". 
-    Your primary goal is to help field interns troubleshoot OSM vehicles using data from the MASTER DATABASE CSV provided in the context.
+    const systemInstruction = `You are the OSM Service Intelligence Hub. You are an expert on Omega Seiki Mobility technical manuals and vehicle wiring.
 
-    DIAGRAM RETRIEVAL PROTOCOL:
-    1. Scan the text provided under [OSM MASTER DATABASE - CSV].
-    2. Match the user's query against the "Diagram" column (component name).
-    3. If a match is found, you MUST start your response with the diagram image in Markdown: ![Component Name](Google Drive URL)
-    4. Follow the image with concise technical instructions in ${languageName}.
-    5. Be specific about pin numbers (e.g., 30, 85, 86, 87) and wire colors.
+STRICT ACCURACY PROTOCOL:
+1. IDENTIFY: Scan the KNOWLEDGE BASE for the exact component (e.g., "MCU Relay", "Regen Relay").
+2. VALIDATE: Ensure you are reading from the correct section. Never assume pin colors or numbers; only use what is explicitly written.
+3. ISOLATE: Do not mix specifications between different relays. If a user asks about MCU, do NOT reference Regen info.
+4. DETAIL: Include Pin Numbers, Wire Colors, and Voltage levels in your steps.
+5. LANGUAGE: Respond in ${languageName}.
+6. IMAGES: Use markdown ![Diagram Title](URL) if a relevant image link exists in the text.
 
-    IMPORTANT:
-    - If the user asks for a relay, show the relay diagram first.
-    - If the user asks for a fuse box, show the fuse layout first.
-    - Always use the URL provided in the CSV. Do not invent links.
-    - If a diagram is found, do NOT suggest opening the URL, the app handles zooming.
+If the information for a specific component query is missing from the provided context, set isUnclear: true.
 
-    RESPONSE SCHEMA (JSON):
-    - 'answer': String containing the image Markdown and instructions.
-    - 'suggestions': Next logical questions.
-    - 'isUnclear': Only true if the part is not in the CSV or manuals.`;
+CRITICAL: Double-check that the pin numbers you provide exactly match the manual section for the component mentioned in the query.`;
 
-    const fullPrompt = `${context}\n\nCHAT HISTORY:\n${chatHistory}\n\nINTERN QUERY: "${query}"`;
+    const fullPrompt = `KNOWLEDGE BASE DATA:\n${context}\n\nHISTORY:\n${chatHistory}\n\nUSER QUERY: "${query}"`;
   
     const response = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
@@ -88,36 +71,57 @@ export async function getChatbotResponse(
                 },
                 required: ["answer", "suggestions", "isUnclear"]
             },
+            // CRITICAL FIX: gemini-3-pro-preview requires a positive thinking budget.
+            thinkingConfig: { thinkingBudget: 16000 }
         },
     });
 
-    const data = JSON.parse(cleanJsonResponse(response.text || "{}")) as GeminiResponse;
+    const text = response.text || "{}";
+    const data = JSON.parse(cleanJsonResponse(text)) as GeminiResponse;
     return data;
   } catch (error: any) {
-    console.error("Intelligence Hub Error:", error);
-    throw new Error(`Analysis Failed: ${error.message}`);
+    console.error("Technical Intelligence Engine Failure:", error);
+    return {
+        answer: "A processing fault occurred in the technical reasoning hub. Please re-state your query with specific component names (e.g., 'MCU Relay diagram').",
+        suggestions: ["MCU Relay Pinout", "Regen Relay Wiring", "Fuse Layout"],
+        isUnclear: true
+    };
   }
 }
 
 export async function generateSpeech(text: string, language: string): Promise<string> {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const languageName = languageMap[language] || 'English';
-    const cleanText = text.replace(/!\[.*?\]\(.*?\)/g, '');
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const languageName = languageMap[language] || 'English';
+        const cleanText = text
+            .replace(/!\[.*?\]\(.*?\)/g, '')
+            .replace(/(https?:\/\/drive\.google\.com\/[^\s\n)]+)/g, '')
+            .replace(/\*\*/g, '')
+            .replace(/#/g, '')
+            .replace(/[-*]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
 
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-preview-tts',
-        contents: [{ parts: [{ text: `Speak in ${languageName}: ${cleanText}` }] }],
-        config: {
-            responseModalities: [Modality.AUDIO],
-            speechConfig: {
-                voiceConfig: {
-                    prebuiltVoiceConfig: { voiceName: 'Kore' },
+        if (!cleanText) return '';
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-preview-tts',
+            contents: [{ parts: [{ text: `Instruction for OSM Technician in ${languageName}: ${cleanText}` }] }],
+            config: {
+                responseModalities: [Modality.AUDIO],
+                speechConfig: {
+                    voiceConfig: {
+                        prebuiltVoiceConfig: { voiceName: 'Kore' },
+                    },
                 },
             },
-        },
-    });
+        });
 
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64Audio) throw new Error("Audio generation failed");
-    return base64Audio;
+        const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        if (!base64Audio) throw new Error("TTS failed");
+        return base64Audio;
+    } catch (error) {
+        console.error("TTS Error:", error);
+        throw error;
+    }
 }
