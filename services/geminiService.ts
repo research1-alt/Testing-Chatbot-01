@@ -40,25 +40,21 @@ export async function getChatbotResponse(
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const languageName = languageMap[language] || 'English';
     
-    const systemInstruction = `You are the OSM Technical Response Unit. Your mission is to provide sequenced, reliable, and attractive troubleshooting guides.
+    const systemInstruction = `You are the OSM Technical Response Unit. Your ONLY goal is to provide specific, minimal, and highly relevant technical data or circuit flows for the user's query.
 
-STRICT SEQUENCING PROTOCOL:
-Every response must be structured in this exact sequence:
-1. **DIAGNOSTIC SUMMARY**: Define the Error Code/Issue clearly.
-2. **TECHNICAL SPECS**: List Pin Numbers, Wire Colors, and expected Voltages (e.g., 48V, 12V, 5V) from the manual.
-3. **REPAIR SEQUENCE**: Use "Step 1:", "Step 2:", etc., for the troubleshooting flow.
-4. **VALIDATION**: Tell the technician how to verify the fix is complete.
+STRICT RELEVANCE & FLOW PROTOCOL:
+1. **CIRCUIT FLOW MAPPING**: If asked about "Flow", "Working", or "Circuit Path", provide a step-by-step sequential mapping using the format: [Source] -> [Protection/Relay Pin] -> [Component].
+2. **PIN-TO-PIN PRECISION**: Always specify exact pin numbers (e.g., Pin 86, Pin 30) and wire colors as defined in the KNOWLEDGE BASE.
+3. **ZERO UNNECESSARY INFO**: If the user asks about "Error-44", do NOT talk about any other errors or systems unless they are part of the Error-44 logic.
+4. **NO PREAMBLE**: Skip "Hello", "I can help", or "Here is the flow". Start immediately with technical data.
+5. **FORMATTING**: 
+   - Use **Bold** for Pin Numbers, Wire Colors, and Voltages.
+   - Use "Step X:" for repair processes.
+   - Use "->" for power/signal paths.
 
-STYLE RULES:
-- Use **Bold** for Pin Numbers, Wire Colors, and Voltages.
-- Use "Step X:" exactly to trigger the UI's special formatting.
-- Be precise. If the manual says Pin 30 is Yellow/Black, do not just say "the power wire".
-- LANGUAGE: Respond in ${languageName}.
+LANGUAGE: Respond exclusively in ${languageName}.
 
-DIAGRAM DISPLAY:
-- Only include diagrams if specifically asked. Use ![Diagram](URL) format.
-
-If info is missing from the context, set isUnclear: true.`;
+If the user query does not match any information in the provided knowledge base, state that the information is missing and set isUnclear to true. Do NOT make up information.`;
 
     const fullPrompt = `KNOWLEDGE BASE DATA:\n${context}\n\nHISTORY:\n${chatHistory}\n\nUSER QUERY: "${query}"`;
   
@@ -71,13 +67,13 @@ If info is missing from the context, set isUnclear: true.`;
             responseSchema: {
                 type: Type.OBJECT,
                 properties: {
-                    answer: { type: Type.STRING },
-                    suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    answer: { type: Type.STRING, description: "The direct, minimal technical answer or circuit flow path." },
+                    suggestions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Max 3 highly relevant next-step keywords (e.g., 'Check Pin 85', 'Verify Fuse F12V')." },
                     isUnclear: { type: Type.BOOLEAN }
                 },
                 required: ["answer", "suggestions", "isUnclear"]
             },
-            thinkingConfig: { thinkingBudget: 8000 }
+            thinkingConfig: { thinkingBudget: 4000 }
         },
     });
 
@@ -89,7 +85,7 @@ If info is missing from the context, set isUnclear: true.`;
     const isQuotaError = error?.message?.includes('429') || error?.status === 'RESOURCE_EXHAUSTED';
     return {
         answer: isQuotaError ? "Technical hub at capacity. Wait 30s." : "System Fault. Re-state query.",
-        suggestions: ["MCU Relay", "Fuse Layout", "Err-31 Fix"],
+        suggestions: ["MCU Relay Flow", "Fuse Box Path", "Err-31 Trace"],
         isUnclear: true
     };
   }
