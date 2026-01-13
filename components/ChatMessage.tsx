@@ -90,34 +90,68 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
         });
     }
 
-    const parts = processedText.split(/(Step \d+:|\*\*.*?\*\*|\d+[V|v]|\bPin \d+\b|\bWire\b)/g);
+    // Advanced technical formatting logic
+    const parts = processedText.split(/(Step \d+:|Pro-Tip:|\*\*.*?\*\*|\d+[V|v]|\bPin \d+\b|\b[A-Z][a-z]+ wire\b)/g);
     const contentNodes: React.ReactNode[] = parts.map((part, index) => {
         if (!part || !part.trim()) return null;
+
+        // Step Styling
         if (/Step \d+:/.test(part)) {
+            const stepNum = part.match(/\d+/)?.[0];
             return (
-                <span key={index} className="flex items-center gap-2 mt-6 mb-3">
-                    <span className="bg-slate-900 text-green-400 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg border border-white/10">
-                        {part.replace(':', '')}
+                <span key={index} className="flex items-center gap-3 mt-8 mb-4">
+                    <span className="flex items-center justify-center bg-sky-900 text-white w-7 h-7 rounded-full text-[12px] font-black shadow-lg">
+                        {stepNum}
                     </span>
-                    <span className="h-[1px] flex-1 bg-slate-100"></span>
+                    <span className="text-[10px] font-black text-sky-900 uppercase tracking-widest bg-sky-50 px-3 py-1 rounded-full border border-sky-100">
+                        INSTRUCTION
+                    </span>
+                    <span className="h-[1px] flex-1 bg-sky-100"></span>
                 </span>
             );
         }
+
+        // Pro-Tip Styling
+        if (part === "Pro-Tip:") {
+            return (
+                <span key={index} className="flex items-center gap-2 mt-8 mb-3 bg-amber-50 border border-amber-200 p-3 rounded-2xl">
+                    <span className="text-xl">💡</span>
+                    <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Field Pro-Tip</span>
+                </span>
+            );
+        }
+
+        // Bold Styling
         if (part.startsWith('**') && part.endsWith('**')) {
             const inner = part.slice(2, -2);
+            // Check if it looks like a header (all caps)
             const isHeader = inner.toUpperCase() === inner && inner.length > 5;
-            return <strong key={index} className={`font-black ${isHeader ? 'block mt-6 mb-2 text-slate-900 text-[12px] tracking-widest border-l-4 border-green-500 pl-3' : 'text-slate-900 bg-yellow-50 px-1 rounded'}`}>{inner}</strong>;
+            if (isHeader) {
+                return (
+                    <div key={index} className="mt-8 mb-3 border-l-4 border-sky-600 pl-4 py-1 bg-sky-50/50 rounded-r-xl">
+                        <span className="text-sky-900 font-black text-[12px] tracking-widest uppercase">{inner}</span>
+                    </div>
+                );
+            }
+            return <strong key={index} className="font-black text-slate-900">{inner}</strong>;
         }
-        if (/\d+[V|v]/.test(part) || /\bPin \d+\b/.test(part)) {
-            return <span key={index} className="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-700 font-black rounded border border-blue-100 mx-0.5 text-[12px]">{part}</span>;
+
+        // Voltages/Pins/Wires Styling
+        if (/\d+[V|v]/.test(part) || /\bPin \d+\b/.test(part) || /\b[A-Z][a-z]+ wire\b/.test(part)) {
+            return (
+                <span key={index} className="inline-block px-2 py-0.5 bg-sky-100 text-sky-900 font-black rounded-lg border border-sky-200 mx-0.5 text-[11px] shadow-sm">
+                    {part}
+                </span>
+            );
         }
-        return <span key={index} className="text-slate-700">{part}</span>;
+
+        return <span key={index} className="text-slate-700 leading-relaxed">{part}</span>;
     });
 
     return (
       <div className="technical-container">
         {imageParts}
-        <div className="message-content-text leading-relaxed tracking-tight">
+        <div className="message-content-text">
           {contentNodes}
         </div>
       </div>
@@ -205,14 +239,15 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
   };
 
   return (
-    <div className={`flex flex-col gap-1 ${isUser ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2 duration-300`}>
-        <div className={`flex items-start gap-3 ${isUser ? 'justify-end' : 'justify-start'} w-full`}>
-            {!isUser && <div className="w-8 h-8 rounded-full bg-slate-950 flex items-center justify-center font-black text-[10px] text-white flex-shrink-0 shadow-lg border-2 border-white uppercase tracking-tighter">OSM</div>}
-            <div className={`rounded-[2rem] p-6 max-w-[90%] sm:max-w-xl group relative shadow-xl transition-all border ${isUser ? 'bg-green-600 text-white border-green-500 rounded-br-none' : 'bg-white text-slate-800 border-slate-100 rounded-bl-none'}`}>
-                <div className="whitespace-pre-wrap text-[14px] leading-[1.7]">
+    <div className={`flex flex-col gap-1 w-full ${isUser ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2 duration-300`}>
+        <div className={`flex items-start gap-3 w-full ${isUser ? 'justify-end' : 'justify-start'}`}>
+            {!isUser && <div className="w-8 h-8 rounded-full bg-sky-900 flex items-center justify-center font-black text-[10px] text-white flex-shrink-0 shadow-lg border-2 border-white uppercase tracking-tighter">OSM</div>}
+            
+            <div className={`rounded-[1.5rem] p-5 max-w-[85%] sm:max-w-xl group relative shadow-xl transition-all border w-fit ${isUser ? 'bg-green-600 text-white border-green-500 rounded-br-none' : 'bg-white text-slate-800 border-slate-100 rounded-bl-none'}`}>
+                <div className="whitespace-pre-wrap text-[14px] leading-[1.6]">
                   {formatText(message.text)}
                 </div>
-                <div className={`text-[9px] mt-6 font-black flex justify-between items-center opacity-60 ${isUser ? 'text-green-50' : 'text-slate-400'}`}>
+                <div className={`text-[9px] mt-4 font-black flex justify-between items-center opacity-60 ${isUser ? 'text-green-50' : 'text-slate-400'}`}>
                     <span className="uppercase tracking-widest">{message.timestamp}</span>
                     {!isUser && (
                         <div className="flex gap-4">
@@ -232,8 +267,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
             {isUser && <UserIcon />}
         </div>
         {!isUser && message.suggestions && (
-            <div className="flex flex-wrap gap-2 ml-11 mt-3">
-                {message.suggestions.map((s, i) => <button key={i} onClick={() => onSendMessage(s)} className="text-[9px] font-black bg-white border border-slate-200 text-slate-500 py-2 px-5 rounded-full hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all uppercase tracking-[0.15em] shadow-sm">{s}</button>)}
+            <div className="flex flex-wrap gap-2 ml-11 mt-2">
+                {message.suggestions.map((s, i) => <button key={i} onClick={() => onSendMessage(s)} className="text-[9px] font-black bg-white border border-slate-200 text-slate-500 py-1.5 px-4 rounded-full hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all uppercase tracking-[0.1em] shadow-sm">{s}</button>)}
             </div>
         )}
 
@@ -252,7 +287,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
                         <span className="text-[10px] font-black text-green-500 uppercase tracking-[0.3em] mb-1">High-Resolution Reference</span>
                         <h4 className="text-white font-black text-lg uppercase tracking-tight">{zoomedImage.alt}</h4>
                     </div>
-                    {/* Updated Close Button with Black X Mark */}
                     <button 
                       onClick={() => setZoomedImage(null)} 
                       className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-black border border-white/20 active:scale-90 transition-all shadow-xl hover:bg-slate-200"
@@ -263,7 +297,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
                     </button>
                 </div>
                 
-                {/* Scrollable/Pannable Area */}
                 <div 
                   className={`flex-1 w-full flex items-center justify-center p-6 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`} 
                   onClick={e => e.stopPropagation()}

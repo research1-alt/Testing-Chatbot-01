@@ -239,7 +239,7 @@ const App: React.FC = () => {
   const selectedLang = INDIAN_LANGUAGES.find(l => l.code === language) || INDIAN_LANGUAGES[0];
 
   return (
-    <div className="flex flex-col h-full max-w-5xl mx-auto border-x bg-gray-50 shadow-2xl overflow-hidden font-sans text-slate-900 relative">
+    <div className="flex flex-col h-full max-w-5xl mx-auto border-x bg-sky-50 shadow-2xl overflow-hidden font-sans text-slate-900 relative">
       
       {/* Install Prompt Banner */}
       {showInstallPrompt && (
@@ -251,78 +251,78 @@ const App: React.FC = () => {
 
       {/* System Reset Overlay */}
       {isRefreshing && (
-        <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center text-white animate-in fade-in duration-300">
-           <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-green-500">System Resetting...</p>
+        <div className="fixed inset-0 z-[100] bg-sky-900 flex flex-col items-center justify-center text-white animate-in fade-in duration-300">
+           <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin mb-4"></div>
+           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white">System Resetting...</p>
         </div>
       )}
 
       {/* Sidebar Overlay */}
       <div className={`fixed inset-0 z-50 transition-all duration-500 ${isSidebarOpen ? 'visible' : 'invisible'}`}>
-        <div className={`absolute inset-0 bg-slate-900/70 backdrop-blur-md transition-opacity duration-500 ${isSidebarOpen ? 'opacity-100' : 'opacity-0'}`} onClick={() => { setIsSidebarOpen(false); setIsLangSelectorOpen(false); }}></div>
-        <aside className={`absolute top-0 left-0 h-full w-80 bg-slate-950 text-white shadow-2xl transition-transform duration-500 transform ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} overflow-hidden`}>
+        <div className={`absolute inset-0 bg-slate-900/40 backdrop-blur-md transition-opacity duration-500 ${isSidebarOpen ? 'opacity-100' : 'opacity-0'}`} onClick={() => { setIsSidebarOpen(false); setIsLangSelectorOpen(false); }}></div>
+        <aside className={`absolute top-0 left-0 h-full w-80 bg-white shadow-2xl transition-transform duration-500 transform ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} overflow-hidden`}>
           <div className={`p-8 h-full flex flex-col transition-transform duration-500 ${isLangSelectorOpen ? '-translate-x-full' : 'translate-x-0'}`}>
             <div className="flex justify-between items-center mb-10 pt-safe">
                 <div className="flex flex-col">
-                    <img src={LOGO_URL} alt="OSM Logo" className="h-12 w-auto object-contain pr-4" />
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Service Portal</span>
+                    <img src={LOGO_URL} alt="OSM Logo" className="h-14 w-auto object-contain pr-4 select-none pointer-events-none" style={{ mixBlendMode: 'multiply' }} />
+                    <span className="text-[10px] font-black text-sky-400 uppercase tracking-widest mt-2">Service Portal</span>
                 </div>
-                <button onClick={() => setIsSidebarOpen(false)} className="p-2 hover:bg-slate-800 rounded-full text-slate-500 transition-colors">
+                <button onClick={() => setIsSidebarOpen(false)} className="p-2 hover:bg-sky-50 rounded-full text-slate-400 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
             </div>
 
             <nav className="flex-1 space-y-3">
-                <button onClick={() => { setShowAdminPanel(false); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black text-[11px] uppercase tracking-widest transition-all ${!showAdminPanel ? 'bg-green-600 text-white shadow-lg' : 'hover:bg-slate-900 text-slate-400'}`}>
+                <button onClick={() => { setShowAdminPanel(false); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black text-[11px] uppercase tracking-widest transition-all ${!showAdminPanel ? 'bg-green-600 text-white shadow-lg' : 'hover:bg-sky-50 text-slate-600'}`}>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
                     Assistant
                 </button>
 
                 {isAdmin && (
-                    <button onClick={() => { setShowAdminPanel(true); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black text-[11px] uppercase tracking-widest transition-all ${showAdminPanel ? 'bg-green-600 text-white shadow-lg' : 'hover:bg-slate-900 text-slate-400'}`}>
+                    <button onClick={() => { setShowAdminPanel(true); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black text-[11px] uppercase tracking-widest transition-all ${showAdminPanel ? 'bg-green-600 text-white shadow-lg' : 'hover:bg-sky-50 text-slate-600'}`}>
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572-1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                         Admin Control
                     </button>
                 )}
 
-                <button type="button" onClick={handleFeedbackClick} className="w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black text-[11px] uppercase tracking-widest text-slate-400 hover:bg-slate-900 transition-all border border-white/5 active:bg-slate-800">
+                <button type="button" onClick={handleFeedbackClick} className="w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black text-[11px] uppercase tracking-widest text-slate-600 hover:bg-sky-50 transition-all border border-slate-100 active:bg-sky-100">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
                     Send Feedback
                 </button>
 
                 <div className="py-2"></div>
 
-                <button onClick={() => setIsLangSelectorOpen(true)} className="w-full flex items-center justify-between px-6 py-5 rounded-3xl bg-slate-900/50 border border-white/5 hover:bg-slate-900 transition-all">
+                <button onClick={() => setIsLangSelectorOpen(true)} className="w-full flex items-center justify-between px-6 py-5 rounded-3xl bg-sky-50 border border-sky-100 hover:bg-sky-100 transition-all">
                     <div className="flex items-center gap-4">
                         <div className="text-xl">{selectedLang.flag}</div>
                         <div className="flex flex-col items-start">
-                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Language</span>
-                            <span className="text-xs font-black text-white">{selectedLang.name}</span>
+                            <span className="text-[10px] font-black text-sky-400 uppercase tracking-widest">Language</span>
+                            <span className="text-xs font-black text-slate-900">{selectedLang.name}</span>
                         </div>
                     </div>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
                 </button>
             </nav>
 
-            <div className="pt-8 border-t border-white/5 pb-safe">
-                <button onClick={handleLogoutAction} className="w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black text-[11px] uppercase tracking-widest text-red-500 hover:bg-red-500/10 transition-all">
+            <div className="pt-8 border-t border-slate-100 pb-safe">
+                <button onClick={handleLogoutAction} className="w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black text-[11px] uppercase tracking-widest text-red-500 hover:bg-red-50 transition-all">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                     Logout
                 </button>
             </div>
           </div>
 
-          <div className={`absolute inset-0 p-8 flex flex-col transition-transform duration-500 bg-slate-950 pt-safe ${isLangSelectorOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+          <div className={`absolute inset-0 p-8 flex flex-col transition-transform duration-500 bg-white pt-safe ${isLangSelectorOpen ? 'translate-x-0' : 'translate-x-full'}`}>
             <div className="flex items-center gap-4 mb-8">
-                <button onClick={() => setIsLangSelectorOpen(false)} className="p-2 hover:bg-slate-800 rounded-full text-slate-500 transition-colors">
+                <button onClick={() => setIsLangSelectorOpen(false)} className="p-2 hover:bg-sky-50 rounded-full text-slate-400 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
                 </button>
-                <h2 className="text-xl font-black uppercase tracking-tighter">Choose Language</h2>
+                <h2 className="text-xl font-black uppercase tracking-tighter text-slate-900">Choose Language</h2>
             </div>
             <div className="flex-1 overflow-y-auto no-scrollbar pb-safe">
                 <div className="grid grid-cols-2 gap-3 pb-8">
                     {INDIAN_LANGUAGES.map((lang) => (
-                        <button key={lang.code} onClick={() => { setLanguage(lang.code); setIsLangSelectorOpen(false); }} className={`flex flex-col items-center justify-center p-5 rounded-3xl transition-all border aspect-square ${language === lang.code ? 'bg-green-600 border-green-500 text-white shadow-xl scale-[1.05] z-10' : 'bg-slate-900/40 border-white/5 text-slate-400 hover:bg-slate-900'}`}>
+                        <button key={lang.code} onClick={() => { setLanguage(lang.code); setIsLangSelectorOpen(false); }} className={`flex flex-col items-center justify-center p-5 rounded-3xl transition-all border aspect-square ${language === lang.code ? 'bg-green-600 border-green-500 text-white shadow-xl scale-[1.05] z-10' : 'bg-sky-50 border-sky-100 text-slate-600 hover:bg-sky-100'}`}>
                             <span className="text-3xl mb-3">{lang.flag}</span>
                             <span className="text-[10px] font-black uppercase tracking-widest text-center">{lang.name}</span>
                         </button>
@@ -333,37 +333,36 @@ const App: React.FC = () => {
         </aside>
       </div>
 
-      <header className="bg-slate-900 text-white p-4 pt-[calc(1rem+env(safe-area-inset-top,0px))] flex justify-between items-center shadow-lg z-20 shrink-0">
+      <header className="bg-white/95 backdrop-blur-md text-slate-900 p-4 pt-[calc(1rem+env(safe-area-inset-top,0px))] flex justify-between items-center shadow-lg z-20 shrink-0 border-b border-sky-100">
           <div className="flex items-center gap-4">
-            <button onClick={() => setIsSidebarOpen(true)} className="p-2.5 bg-slate-800 rounded-2xl text-slate-300 hover:text-white transition-all shadow-inner">
+            <button onClick={() => setIsSidebarOpen(true)} className="p-2.5 bg-sky-50 rounded-2xl text-slate-500 hover:text-sky-600 transition-all shadow-inner border border-sky-100 active:scale-95">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>
             <div className="flex flex-col">
-              <img src={LOGO_URL} alt="OSM Logo" className="h-9 w-auto object-contain object-left pr-4" />
+              <img src={LOGO_URL} alt="OSM Logo" className="h-10 w-auto object-contain object-left pr-4 select-none pointer-events-none" style={{ mixBlendMode: 'multiply' }} />
               <div className="flex items-center gap-2 mt-1">
                 <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'success' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`}></div>
-                <p className="text-[8px] text-slate-500 font-black uppercase tracking-[0.2em]">{showAdminPanel ? 'Admin Mode' : 'Technical Support'}</p>
+                <p className="text-[8px] text-slate-400 font-black uppercase tracking-[0.2em]">{showAdminPanel ? 'Admin Mode' : 'Technical Support'}</p>
               </div>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button 
               onClick={handleReloadApp}
-              className="group relative flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-white/10 rounded-2xl transition-all shadow-2xl hover:shadow-green-500/20"
+              className="p-2.5 bg-sky-50 hover:bg-sky-100 active:bg-sky-200 border border-sky-100 rounded-full text-sky-600 transition-all shadow-sm group active:scale-90"
               title="Refresh Application"
             >
-              <div className="relative">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-500 group-hover:rotate-[360deg] transition-transform duration-700 ease-in-out" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  <div className="absolute inset-0 bg-green-500/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              </div>
-              <span className="hidden sm:inline text-[9px] font-black uppercase tracking-[0.2em] text-slate-300 group-hover:text-white transition-colors ml-2">Refresh</span>
+              <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
             </button>
             
-            <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center font-black text-xs text-green-500 shadow-inner border border-white/5">
-              {user?.name?.[0] || 'U'}
+            <div className="flex items-center gap-3 pl-3 border-l border-sky-100">
+                <span className="hidden xs:inline text-[11px] font-black text-sky-900 uppercase tracking-tight">{user?.name}</span>
+                <div className="w-10 h-10 rounded-2xl bg-sky-900 flex items-center justify-center font-black text-sm text-white shadow-xl border-2 border-white">
+                  {user?.name?.[0] || 'U'}
+                </div>
             </div>
           </div>
       </header>
@@ -380,9 +379,9 @@ const App: React.FC = () => {
                 cloudData={masterSheetContent} 
               />
             </div>
-            <div className="absolute bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-slate-200 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] z-40 flex items-center justify-between pb-safe">
+            <div className="absolute bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur-md border-t border-sky-100 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] z-40 flex items-center justify-between pb-safe">
                 <FileUpload onFilesStored={handleFilesStored} onError={(msg) => alert(msg)} />
-                <span className="hidden xs:inline text-[9px] font-black uppercase text-slate-400 tracking-widest ml-4">Management Hub</span>
+                <span className="hidden xs:inline text-[9px] font-black uppercase text-sky-400 tracking-widest ml-4">Management Hub</span>
             </div>
           </div>
         ) : (
