@@ -40,24 +40,30 @@ export async function getChatbotResponse(
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const languageName = languageMap[language] || 'English';
     
-    const systemInstruction = `You are the OSM Service Intelligence Hub. You are an expert on Omega Seiki Mobility technical manuals and vehicle wiring.
+    const systemInstruction = `You are the OSM Technical Response Unit. Your mission is to provide sequenced, reliable, and attractive troubleshooting guides.
 
-STRICT ACCURACY PROTOCOL:
-1. IDENTIFY: Scan the KNOWLEDGE BASE for the exact component (e.g., "MCU Relay", "Regen Relay").
-2. VALIDATE: Ensure you are reading from the correct section. Never assume pin colors or numbers; only use what is explicitly written.
-3. ISOLATE: Do not mix specifications between different relays. If a user asks about MCU, do NOT reference Regen info.
-4. DETAIL: Include Pin Numbers, Wire Colors, and Voltage levels in your steps.
-5. LANGUAGE: Respond in ${languageName}.
-6. IMAGES: Use markdown ![Diagram Title](URL) if a relevant image link exists in the text.
+STRICT SEQUENCING PROTOCOL:
+Every response must be structured in this exact sequence:
+1. **DIAGNOSTIC SUMMARY**: Define the Error Code/Issue clearly.
+2. **TECHNICAL SPECS**: List Pin Numbers, Wire Colors, and expected Voltages (e.g., 48V, 12V, 5V) from the manual.
+3. **REPAIR SEQUENCE**: Use "Step 1:", "Step 2:", etc., for the troubleshooting flow.
+4. **VALIDATION**: Tell the technician how to verify the fix is complete.
 
-If the information for a specific component query is missing from the provided context, set isUnclear: true.
+STYLE RULES:
+- Use **Bold** for Pin Numbers, Wire Colors, and Voltages.
+- Use "Step X:" exactly to trigger the UI's special formatting.
+- Be precise. If the manual says Pin 30 is Yellow/Black, do not just say "the power wire".
+- LANGUAGE: Respond in ${languageName}.
 
-CRITICAL: Double-check that the pin numbers you provide exactly match the manual section for the component mentioned in the query.`;
+DIAGRAM DISPLAY:
+- Only include diagrams if specifically asked. Use ![Diagram](URL) format.
+
+If info is missing from the context, set isUnclear: true.`;
 
     const fullPrompt = `KNOWLEDGE BASE DATA:\n${context}\n\nHISTORY:\n${chatHistory}\n\nUSER QUERY: "${query}"`;
   
     const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-3-flash-preview',
         contents: [{ parts: [{ text: fullPrompt }] }],
         config: {
             systemInstruction,
@@ -71,8 +77,7 @@ CRITICAL: Double-check that the pin numbers you provide exactly match the manual
                 },
                 required: ["answer", "suggestions", "isUnclear"]
             },
-            // CRITICAL FIX: gemini-3-pro-preview requires a positive thinking budget.
-            thinkingConfig: { thinkingBudget: 16000 }
+            thinkingConfig: { thinkingBudget: 8000 }
         },
     });
 
@@ -81,9 +86,10 @@ CRITICAL: Double-check that the pin numbers you provide exactly match the manual
     return data;
   } catch (error: any) {
     console.error("Technical Intelligence Engine Failure:", error);
+    const isQuotaError = error?.message?.includes('429') || error?.status === 'RESOURCE_EXHAUSTED';
     return {
-        answer: "A processing fault occurred in the technical reasoning hub. Please re-state your query with specific component names (e.g., 'MCU Relay diagram').",
-        suggestions: ["MCU Relay Pinout", "Regen Relay Wiring", "Fuse Layout"],
+        answer: isQuotaError ? "Technical hub at capacity. Wait 30s." : "System Fault. Re-state query.",
+        suggestions: ["MCU Relay", "Fuse Layout", "Err-31 Fix"],
         isUnclear: true
     };
   }
@@ -93,30 +99,16 @@ export async function generateSpeech(text: string, language: string): Promise<st
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const languageName = languageMap[language] || 'English';
-        const cleanText = text
-            .replace(/!\[.*?\]\(.*?\)/g, '')
-            .replace(/(https?:\/\/drive\.google\.com\/[^\s\n)]+)/g, '')
-            .replace(/\*\*/g, '')
-            .replace(/#/g, '')
-            .replace(/[-*]/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-
+        const cleanText = text.replace(/!\[.*?\]\(.*?\)/g, '').replace(/(https?:\/\/drive\.google\.com\/[^\s\n)]+)/g, '').replace(/\*\*/g, '').replace(/#/g, '').replace(/[-*]/g, ' ').trim();
         if (!cleanText) return '';
-
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-preview-tts',
-            contents: [{ parts: [{ text: `Instruction for OSM Technician in ${languageName}: ${cleanText}` }] }],
+            contents: [{ parts: [{ text: `OSM Instructions in ${languageName}: ${cleanText}` }] }],
             config: {
                 responseModalities: [Modality.AUDIO],
-                speechConfig: {
-                    voiceConfig: {
-                        prebuiltVoiceConfig: { voiceName: 'Kore' },
-                    },
-                },
+                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
             },
         });
-
         const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
         if (!base64Audio) throw new Error("TTS failed");
         return base64Audio;
