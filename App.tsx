@@ -14,6 +14,7 @@ import useAuth from './hooks/useAuth';
 
 const ADMIN_EMAIL = 'research1@omegaseikimobility.com';
 const FEEDBACK_URL = 'https://forms.gle/YcrerYAazwxi5zXL7';
+const LOGO_URL = "https://ik.imagekit.io/m8gcj8knd/white%20(with%20background).png";
 
 const INDIAN_LANGUAGES = [
     { code: 'en-US', name: 'English', native: 'English', flag: '🇬🇧' },
@@ -220,7 +221,7 @@ const App: React.FC = () => {
     }
   };
 
-  if (view === 'intro') return <IntroPage onStart={() => setView('auth')} />;
+  if (view === 'intro') return <IntroPage onStart={() => setView('auth')} logoUrl={LOGO_URL} />;
   if (view === 'auth') return (
     <AuthPage 
       onLogin={login} 
@@ -230,7 +231,8 @@ const App: React.FC = () => {
       checkEmailExists={checkEmailExists}
       resetPassword={resetPassword}
       error={authError} 
-      isLoading={isAuthLoading} 
+      isLoading={isAuthLoading}
+      logoUrl={LOGO_URL}
     />
   );
 
@@ -260,9 +262,9 @@ const App: React.FC = () => {
         <div className={`absolute inset-0 bg-slate-900/70 backdrop-blur-md transition-opacity duration-500 ${isSidebarOpen ? 'opacity-100' : 'opacity-0'}`} onClick={() => { setIsSidebarOpen(false); setIsLangSelectorOpen(false); }}></div>
         <aside className={`absolute top-0 left-0 h-full w-80 bg-slate-950 text-white shadow-2xl transition-transform duration-500 transform ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} overflow-hidden`}>
           <div className={`p-8 h-full flex flex-col transition-transform duration-500 ${isLangSelectorOpen ? '-translate-x-full' : 'translate-x-0'}`}>
-            <div className="flex justify-between items-center mb-10">
+            <div className="flex justify-between items-center mb-10 pt-safe">
                 <div className="flex flex-col">
-                    <h2 className="text-4xl font-black tracking-tighter text-green-500 uppercase">OSM</h2>
+                    <img src={LOGO_URL} alt="OSM Logo" className="h-12 w-auto object-contain pr-4" />
                     <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Service Portal</span>
                 </div>
                 <button onClick={() => setIsSidebarOpen(false)} className="p-2 hover:bg-slate-800 rounded-full text-slate-500 transition-colors">
@@ -302,7 +304,7 @@ const App: React.FC = () => {
                 </button>
             </nav>
 
-            <div className="pt-8 border-t border-white/5">
+            <div className="pt-8 border-t border-white/5 pb-safe">
                 <button onClick={handleLogoutAction} className="w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black text-[11px] uppercase tracking-widest text-red-500 hover:bg-red-500/10 transition-all">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                     Logout
@@ -310,14 +312,14 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          <div className={`absolute inset-0 p-8 flex flex-col transition-transform duration-500 bg-slate-950 ${isLangSelectorOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+          <div className={`absolute inset-0 p-8 flex flex-col transition-transform duration-500 bg-slate-950 pt-safe ${isLangSelectorOpen ? 'translate-x-0' : 'translate-x-full'}`}>
             <div className="flex items-center gap-4 mb-8">
                 <button onClick={() => setIsLangSelectorOpen(false)} className="p-2 hover:bg-slate-800 rounded-full text-slate-500 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
                 </button>
                 <h2 className="text-xl font-black uppercase tracking-tighter">Choose Language</h2>
             </div>
-            <div className="flex-1 overflow-y-auto no-scrollbar">
+            <div className="flex-1 overflow-y-auto no-scrollbar pb-safe">
                 <div className="grid grid-cols-2 gap-3 pb-8">
                     {INDIAN_LANGUAGES.map((lang) => (
                         <button key={lang.code} onClick={() => { setLanguage(lang.code); setIsLangSelectorOpen(false); }} className={`flex flex-col items-center justify-center p-5 rounded-3xl transition-all border aspect-square ${language === lang.code ? 'bg-green-600 border-green-500 text-white shadow-xl scale-[1.05] z-10' : 'bg-slate-900/40 border-white/5 text-slate-400 hover:bg-slate-900'}`}>
@@ -331,13 +333,13 @@ const App: React.FC = () => {
         </aside>
       </div>
 
-      <header className="bg-slate-900 text-white p-4 flex justify-between items-center shadow-lg z-20 shrink-0">
+      <header className="bg-slate-900 text-white p-4 pt-[calc(1rem+env(safe-area-inset-top,0px))] flex justify-between items-center shadow-lg z-20 shrink-0">
           <div className="flex items-center gap-4">
             <button onClick={() => setIsSidebarOpen(true)} className="p-2.5 bg-slate-800 rounded-2xl text-slate-300 hover:text-white transition-all shadow-inner">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>
             <div className="flex flex-col">
-              <h1 className="font-black text-2xl uppercase tracking-tighter leading-none">OSM</h1>
+              <img src={LOGO_URL} alt="OSM Logo" className="h-9 w-auto object-contain object-left pr-4" />
               <div className="flex items-center gap-2 mt-1">
                 <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'success' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`}></div>
                 <p className="text-[8px] text-slate-500 font-black uppercase tracking-[0.2em]">{showAdminPanel ? 'Admin Mode' : 'Technical Support'}</p>
@@ -346,7 +348,6 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-3">
-            {/* Always show refresh button now */}
             <button 
               onClick={handleReloadApp}
               className="group relative flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-white/10 rounded-2xl transition-all shadow-2xl hover:shadow-green-500/20"
@@ -370,7 +371,6 @@ const App: React.FC = () => {
       <main className="flex-1 overflow-hidden flex flex-col">
         {showAdminPanel && isAdmin ? (
           <div className="flex-1 flex flex-col relative overflow-hidden">
-            {/* Admin layout structure improved to avoid cutting off bottom scroll content */}
             <div className="flex-1 overflow-hidden flex flex-col">
               <AdminDashboard 
                 interns={getAllInterns()} 

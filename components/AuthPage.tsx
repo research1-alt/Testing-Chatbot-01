@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { AuthCredentials, LoginResult } from '../hooks/useAuth';
 import { sendOtpViaGateway } from '../services/otpService';
 
+// Added logoUrl to AuthPageProps to fix type error in App.tsx
 interface AuthPageProps {
   onLogin: (credentials: AuthCredentials) => Promise<LoginResult>;
   onFinalizeLogin: (userData: any) => void;
@@ -12,13 +13,15 @@ interface AuthPageProps {
   resetPassword: (email: string, newPass: string) => Promise<boolean>;
   error: string | null;
   isLoading: boolean;
+  logoUrl: string;
 }
 
 type AuthViewMode = 'login' | 'signup' | 'otp' | 'forgot-password' | 'reset-password';
 
 const AuthPage: React.FC<AuthPageProps> = ({ 
     onLogin, onFinalizeLogin, onSignup, commitSignup, 
-    checkEmailExists, resetPassword, error: authError, isLoading 
+    checkEmailExists, resetPassword, error: authError, isLoading,
+    logoUrl // Destructured logoUrl
 }) => {
   const [viewMode, setViewMode] = useState<AuthViewMode>('login');
   const [otpPurpose, setOtpPurpose] = useState<'signup' | 'reset'>('signup');
@@ -204,7 +207,8 @@ const AuthPage: React.FC<AuthPageProps> = ({
         {viewMode === 'signup' && (
             <div className="max-w-md w-full bg-white border border-slate-200 rounded-[2rem] p-8 shadow-xl slide-in">
                 <div className="mb-6 text-center">
-                    <h2 className="text-3xl font-black text-slate-900 tracking-tight uppercase">OSM</h2>
+                    {/* Replaced text with logoUrl image */}
+                    <img src={logoUrl} alt="OSM Logo" className="h-10 w-auto object-contain mx-auto mb-2" />
                     <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Register Intern</p>
                 </div>
                 <form onSubmit={handleSignupSubmit} className="space-y-4">
@@ -238,7 +242,8 @@ const AuthPage: React.FC<AuthPageProps> = ({
         {viewMode === 'forgot-password' && (
             <div className="max-w-md w-full bg-white border border-slate-200 rounded-[2rem] p-8 shadow-xl slide-in">
                 <div className="mb-6 text-center">
-                    <h2 className="text-3xl font-black text-slate-900 tracking-tight uppercase">OSM</h2>
+                    {/* Replaced text with logoUrl image */}
+                    <img src={logoUrl} alt="OSM Logo" className="h-10 w-auto object-contain mx-auto mb-2" />
                     <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Reset Password</p>
                 </div>
                 <p className="text-slate-500 text-[11px] font-bold text-center mb-6 leading-relaxed uppercase tracking-wide">Enter your registered Mail id to receive a verification OTP.</p>
@@ -259,7 +264,8 @@ const AuthPage: React.FC<AuthPageProps> = ({
         {viewMode === 'reset-password' && (
             <div className="max-w-md w-full bg-white border border-slate-200 rounded-[2rem] p-8 shadow-xl slide-in">
                 <div className="mb-6 text-center">
-                    <h2 className="text-3xl font-black text-slate-900 tracking-tight uppercase">OSM</h2>
+                    {/* Replaced text with logoUrl image */}
+                    <img src={logoUrl} alt="OSM Logo" className="h-10 w-auto object-contain mx-auto mb-2" />
                     <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Set New Password</p>
                 </div>
                 <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -315,7 +321,8 @@ const AuthPage: React.FC<AuthPageProps> = ({
         {viewMode === 'login' && (
             <div className="max-w-md w-full bg-white border border-slate-200 rounded-[2rem] p-8 shadow-xl slide-in">
                 <div className="text-center mb-8">
-                    <h2 className="text-3xl font-black text-slate-900 tracking-tight uppercase">OSM</h2>
+                    {/* Replaced text with logoUrl image */}
+                    <img src={logoUrl} alt="OSM Logo" className="h-10 w-auto object-contain mx-auto mb-2" />
                     <p className="text-slate-400 text-[9px] mt-1 font-black uppercase tracking-[0.2em] opacity-60">Field Intelligence Portal</p>
                 </div>
                 <form onSubmit={handleLoginSubmit} className="space-y-4">

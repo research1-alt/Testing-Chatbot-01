@@ -4,10 +4,10 @@
 @tailwind utilities;
 
 :root {
-  --sat: env(safe-area-inset-top);
-  --sar: env(safe-area-inset-right);
-  --sab: env(safe-area-inset-bottom);
-  --sal: env(safe-area-inset-left);
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
 }
 
 * {
@@ -32,6 +32,8 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
+  /* Safe area padding for the whole app if needed, 
+     but we'll apply it specifically to header/footer */
 }
 
 input, textarea {
@@ -75,4 +77,12 @@ input, textarea {
 /* Custom shadow for tech cards */
 .technical-card-shadow {
     box-shadow: 0 10px 30px -10px rgba(0,0,0,0.1);
+}
+
+.pt-safe {
+  padding-top: var(--sat);
+}
+
+.pb-safe {
+  padding-bottom: var(--sab);
 }

@@ -30,12 +30,6 @@
       "purpose": "any"
     },
     {
-      "src": "https://ik.imagekit.io/m8gcj8knd/tr:w-512,h-512/white%20(with%20background).png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
       "src": "https://ik.imagekit.io/m8gcj8knd/tr:w-1024,h-1024/white%20(with%20background).png",
       "sizes": "1024x1024",
       "type": "image/png",

@@ -1,14 +1,18 @@
 
 import React from 'react';
 
+// Added logoUrl to IntroPageProps to fix type error in App.tsx
 interface IntroPageProps {
   onStart: () => void;
+  logoUrl: string;
 }
 
-const IntroPage: React.FC<IntroPageProps> = ({ onStart }) => {
+const IntroPage: React.FC<IntroPageProps> = ({ onStart, logoUrl }) => {
   return (
     <div className="h-screen w-screen bg-white flex items-center justify-center font-sans text-gray-900 p-4">
       <div className="max-w-2xl w-full bg-gray-50 border border-gray-200 rounded-3xl p-12 shadow-2xl text-center flex flex-col items-center">
+        {/* Added logo image using logoUrl prop */}
+        <img src={logoUrl} alt="OSM Logo" className="h-20 w-auto object-contain mb-8" />
         <h1 className="text-5xl font-black text-gray-900 mb-4 tracking-tight uppercase">OSM</h1>
         <div className="w-16 h-1.5 bg-green-600 rounded-full mb-8"></div>
         <p className="text-gray-600 mb-10 max-w-lg text-lg leading-relaxed font-medium">
