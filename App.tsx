@@ -68,11 +68,8 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
-      // Prevent the mini-infobar from appearing on mobile
       e.preventDefault();
-      // Stash the event so it can be triggered later.
       setDeferredPrompt(e);
-      // Show our custom install banner
       setShowInstallPrompt(true);
     };
 
@@ -85,12 +82,9 @@ const App: React.FC = () => {
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
-    // Show the browser's install prompt
     deferredPrompt.prompt();
-    // Wait for the user to respond to the prompt
     const { outcome } = await deferredPrompt.userChoice;
     console.log(`User response to the install prompt: ${outcome}`);
-    // We've used the prompt, and can't use it again, so clear it
     setDeferredPrompt(null);
     setShowInstallPrompt(false);
   };
@@ -98,10 +92,14 @@ const App: React.FC = () => {
   const handleReloadApp = useCallback(() => {
     setIsRefreshing(true);
     setIsSidebarOpen(false);
+    // Clearing messages and increments session key
     setMessages([]);
     setTimeout(() => {
         setChatSessionKey(prev => prev + 1);
         setIsRefreshing(false);
+        // Optionally reload data if in admin mode or chat mode
+        fetchMasterSheet();
+        loadKnowledgeBase();
     }, 500);
   }, []);
 
@@ -239,7 +237,7 @@ const App: React.FC = () => {
   const selectedLang = INDIAN_LANGUAGES.find(l => l.code === language) || INDIAN_LANGUAGES[0];
 
   return (
-    <div className="flex flex-col h-screen max-w-5xl mx-auto border-x bg-gray-50 shadow-2xl overflow-hidden font-sans text-slate-900 relative">
+    <div className="flex flex-col h-full max-w-5xl mx-auto border-x bg-gray-50 shadow-2xl overflow-hidden font-sans text-slate-900 relative">
       
       {/* Install Prompt Banner */}
       {showInstallPrompt && (
@@ -333,7 +331,7 @@ const App: React.FC = () => {
         </aside>
       </div>
 
-      <header className="bg-slate-900 text-white p-4 flex justify-between items-center shadow-lg z-20">
+      <header className="bg-slate-900 text-white p-4 flex justify-between items-center shadow-lg z-20 shrink-0">
           <div className="flex items-center gap-4">
             <button onClick={() => setIsSidebarOpen(true)} className="p-2.5 bg-slate-800 rounded-2xl text-slate-300 hover:text-white transition-all shadow-inner">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" /></svg>
@@ -348,21 +346,20 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-3">
-            {!showAdminPanel && (
-              <button 
-                onClick={handleReloadApp}
-                className="group relative flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-white/10 rounded-2xl transition-all shadow-2xl hover:shadow-green-500/20"
-                title="Refresh Application"
-              >
-                <div className="relative">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-500 group-hover:rotate-[360deg] transition-transform duration-700 ease-in-out" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    <div className="absolute inset-0 bg-green-500/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                </div>
-                <span className="hidden sm:inline text-[9px] font-black uppercase tracking-[0.2em] text-slate-300 group-hover:text-white transition-colors ml-2">Refresh</span>
-              </button>
-            )}
+            {/* Always show refresh button now */}
+            <button 
+              onClick={handleReloadApp}
+              className="group relative flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-white/10 rounded-2xl transition-all shadow-2xl hover:shadow-green-500/20"
+              title="Refresh Application"
+            >
+              <div className="relative">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-500 group-hover:rotate-[360deg] transition-transform duration-700 ease-in-out" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <div className="absolute inset-0 bg-green-500/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              </div>
+              <span className="hidden sm:inline text-[9px] font-black uppercase tracking-[0.2em] text-slate-300 group-hover:text-white transition-colors ml-2">Refresh</span>
+            </button>
             
             <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center font-black text-xs text-green-500 shadow-inner border border-white/5">
               {user?.name?.[0] || 'U'}
@@ -372,11 +369,20 @@ const App: React.FC = () => {
 
       <main className="flex-1 overflow-hidden flex flex-col">
         {showAdminPanel && isAdmin ? (
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <AdminDashboard interns={getAllInterns()} onDeleteIntern={deleteIntern} kbFiles={kbFiles} onDeleteFile={handleDeleteFile} cloudData={masterSheetContent} />
-            <div className="p-4 bg-white border-t border-slate-200 shadow-2xl z-30 flex items-center justify-between">
+          <div className="flex-1 flex flex-col relative overflow-hidden">
+            {/* Admin layout structure improved to avoid cutting off bottom scroll content */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <AdminDashboard 
+                interns={getAllInterns()} 
+                onDeleteIntern={deleteIntern} 
+                kbFiles={kbFiles} 
+                onDeleteFile={handleDeleteFile} 
+                cloudData={masterSheetContent} 
+              />
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-slate-200 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] z-40 flex items-center justify-between pb-safe">
                 <FileUpload onFilesStored={handleFilesStored} onError={(msg) => alert(msg)} />
-                <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Admin Control Panel</span>
+                <span className="hidden xs:inline text-[9px] font-black uppercase text-slate-400 tracking-widest ml-4">Management Hub</span>
             </div>
           </div>
         ) : (
