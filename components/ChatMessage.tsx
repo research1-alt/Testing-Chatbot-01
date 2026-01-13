@@ -58,8 +58,12 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
   const [isAudioLoading, setIsAudioLoading] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<{url: string, alt: string} | null>(null);
   const [zoomScale, setZoomScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const dragStart = useRef({ x: 0, y: 0 });
 
   const formatText = (text: string) => {
     const mdRegex = /(!\[.*?\]\(.*?\))/g;
@@ -86,12 +90,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
         });
     }
 
-    // Advanced technical formatting for reliable reading
     const parts = processedText.split(/(Step \d+:|\*\*.*?\*\*|\d+[V|v]|\bPin \d+\b|\bWire\b)/g);
     const contentNodes: React.ReactNode[] = parts.map((part, index) => {
         if (!part || !part.trim()) return null;
-
-        // Sequence Step Styling
         if (/Step \d+:/.test(part)) {
             return (
                 <span key={index} className="flex items-center gap-2 mt-6 mb-3">
@@ -102,19 +103,14 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
                 </span>
             );
         }
-        
-        // Bold headers
         if (part.startsWith('**') && part.endsWith('**')) {
             const inner = part.slice(2, -2);
             const isHeader = inner.toUpperCase() === inner && inner.length > 5;
             return <strong key={index} className={`font-black ${isHeader ? 'block mt-6 mb-2 text-slate-900 text-[12px] tracking-widest border-l-4 border-green-500 pl-3' : 'text-slate-900 bg-yellow-50 px-1 rounded'}`}>{inner}</strong>;
         }
-
-        // Technical Spec Highlighting (Voltages & Pins)
         if (/\d+[V|v]/.test(part) || /\bPin \d+\b/.test(part)) {
             return <span key={index} className="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-700 font-black rounded border border-blue-100 mx-0.5 text-[12px]">{part}</span>;
         }
-
         return <span key={index} className="text-slate-700">{part}</span>;
     });
 
@@ -147,6 +143,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
                     onClick={() => {
                         setZoomedImage({ url: directUrl, alt });
                         setZoomScale(1);
+                        setOffset({ x: 0, y: 0 });
                     }}
                 />
             </div>
@@ -186,6 +183,27 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
     }
   };
 
+  const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
+    setIsDragging(true);
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    dragStart.current = { x: clientX - offset.x, y: clientY - offset.y };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDragging) return;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    setOffset({
+      x: clientX - dragStart.current.x,
+      y: clientY - dragStart.current.y
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
   return (
     <div className={`flex flex-col gap-1 ${isUser ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2 duration-300`}>
         <div className={`flex items-start gap-3 ${isUser ? 'justify-end' : 'justify-start'} w-full`}>
@@ -220,20 +238,56 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
         )}
 
         {zoomedImage && (
-            <div className="fixed inset-0 z-[100] bg-slate-950/98 flex flex-col items-center justify-center backdrop-blur-xl animate-in fade-in duration-300" onClick={() => setZoomedImage(null)}>
+            <div 
+              className="fixed inset-0 z-[100] bg-slate-950/98 flex flex-col items-center justify-center backdrop-blur-xl animate-in fade-in duration-300 overflow-hidden" 
+              onClick={() => setZoomedImage(null)}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              onTouchMove={handleMouseMove}
+              onTouchEnd={handleMouseUp}
+            >
                 <div className="absolute top-0 left-0 right-0 p-8 flex justify-between items-center z-[110]" onClick={e => e.stopPropagation()}>
                     <div className="flex flex-col">
                         <span className="text-[10px] font-black text-green-500 uppercase tracking-[0.3em] mb-1">High-Resolution Reference</span>
                         <h4 className="text-white font-black text-lg uppercase tracking-tight">{zoomedImage.alt}</h4>
                     </div>
-                    <button onClick={() => setZoomedImage(null)} className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-white border border-white/20 active:scale-90 transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                    {/* Updated Close Button with Black X Mark */}
+                    <button 
+                      onClick={() => setZoomedImage(null)} 
+                      className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-black border border-white/20 active:scale-90 transition-all shadow-xl hover:bg-slate-200"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
                 </div>
-                <div className="flex-1 w-full flex items-center justify-center p-6" onClick={e => e.stopPropagation()}>
-                    <img src={zoomedImage.url} alt={zoomedImage.alt} className="max-w-full max-h-[75vh] rounded-2xl shadow-[0_0_100px_rgba(22,163,74,0.2)] object-contain transition-transform duration-300" style={{ transform: `scale(${zoomScale})` }} />
+                
+                {/* Scrollable/Pannable Area */}
+                <div 
+                  className={`flex-1 w-full flex items-center justify-center p-6 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`} 
+                  onClick={e => e.stopPropagation()}
+                  onMouseDown={handleMouseDown}
+                  onTouchStart={handleMouseDown}
+                >
+                    <img 
+                      src={zoomedImage.url} 
+                      alt={zoomedImage.alt} 
+                      className="max-w-none shadow-[0_0_100px_rgba(22,163,74,0.1)] object-contain select-none pointer-events-none" 
+                      style={{ 
+                        transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoomScale})`,
+                        transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+                        maxHeight: '100%'
+                      }} 
+                    />
                 </div>
-                <div className="absolute bottom-12 flex gap-4 bg-slate-900 p-4 rounded-[2rem] border border-white/10 shadow-2xl z-[110]" onClick={e => e.stopPropagation()}>
+
+                <div className="absolute bottom-12 flex items-center gap-4 bg-slate-900 p-4 rounded-[2rem] border border-white/10 shadow-2xl z-[110]" onClick={e => e.stopPropagation()}>
                     <button onClick={() => setZoomScale(s => Math.max(0.5, s - 0.5))} className="w-14 h-14 rounded-2xl bg-white/5 hover:bg-white/10 text-white transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M20 12H4" /></svg></button>
-                    <div className="flex items-center justify-center px-6 font-black text-white text-xs uppercase tracking-widest min-w-[80px]">{Math.round(zoomScale * 100)}%</div>
+                    <div className="flex flex-col items-center justify-center min-w-[100px]">
+                        <div className="font-black text-white text-xs uppercase tracking-widest">{Math.round(zoomScale * 100)}%</div>
+                        <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-1">DRAG TO PAN</div>
+                    </div>
                     <button onClick={() => setZoomScale(s => Math.min(5, s + 0.5))} className="w-14 h-14 rounded-2xl bg-green-600 hover:bg-green-500 text-white transition-all"><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg></button>
                 </div>
             </div>
