@@ -32,12 +32,6 @@ const INDIAN_LANGUAGES = [
     { code: 'or-IN', name: 'Odia', native: 'Odia', flag: '🇮🇳' },
 ];
 
-const ORIENTATIONS = [
-    { code: 'any', name: 'Auto-Rotate', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg> },
-    { code: 'portrait', name: 'Portrait', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg> },
-    { code: 'landscape', name: 'Landscape', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" className="rotate-90 origin-center" /></svg> },
-];
-
 const App: React.FC = () => {
   const { 
     user, view, setView, login, finalizeLogin, signup, commitSignup, 
@@ -57,9 +51,7 @@ const App: React.FC = () => {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLangSelectorOpen, setIsLangSelectorOpen] = useState(false);
-  const [isOrientationSelectorOpen, setIsOrientationSelectorOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
-  const [orientation, setOrientation] = useState<'any' | 'portrait' | 'landscape'>('any');
 
   // PWA Install Prompt State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -157,28 +149,6 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const handleOrientationChange = async (mode: 'portrait' | 'landscape' | 'any') => {
-    setOrientation(mode);
-    setIsOrientationSelectorOpen(false);
-    try {
-      if (mode === 'any') {
-        if (screen.orientation && (screen.orientation as any).unlock) {
-          await (screen.orientation as any).unlock();
-        }
-      } else {
-        // Fullscreen often required for orientation lock
-        if (!document.fullscreenElement) {
-          try { await document.documentElement.requestFullscreen(); } catch (e) { /* silent fail */ }
-        }
-        if (screen.orientation && (screen.orientation as any).lock) {
-          await (screen.orientation as any).lock(mode);
-        }
-      }
-    } catch (err) {
-      console.warn("Orientation lock failed (this is normal on some browsers):", err);
-    }
-  };
-
   useEffect(() => {
     if (view === 'chat') {
       fetchMasterSheet();
@@ -265,7 +235,6 @@ const App: React.FC = () => {
   );
 
   const selectedLang = INDIAN_LANGUAGES.find(l => l.code === language) || INDIAN_LANGUAGES[0];
-  const selectedOrientation = ORIENTATIONS.find(o => o.code === orientation) || ORIENTATIONS[0];
 
   return (
     <div className="flex flex-col h-full max-w-5xl mx-auto border-x bg-sky-50 shadow-2xl overflow-hidden font-sans text-slate-900 relative">
@@ -286,11 +255,11 @@ const App: React.FC = () => {
 
       {/* Sidebar Overlay */}
       <div className={`fixed inset-0 z-50 transition-all duration-500 ${isSidebarOpen ? 'visible' : 'invisible'}`}>
-        <div className={`absolute inset-0 bg-slate-900/40 backdrop-blur-md transition-opacity duration-500 ${isSidebarOpen ? 'opacity-100' : 'opacity-0'}`} onClick={() => { setIsSidebarOpen(false); setIsLangSelectorOpen(false); setIsOrientationSelectorOpen(false); }}></div>
+        <div className={`absolute inset-0 bg-slate-900/40 backdrop-blur-md transition-opacity duration-500 ${isSidebarOpen ? 'opacity-100' : 'opacity-0'}`} onClick={() => { setIsSidebarOpen(false); setIsLangSelectorOpen(false); }}></div>
         <aside className={`absolute top-0 left-0 h-full w-[70vw] sm:w-80 bg-white shadow-2xl transition-transform duration-500 transform ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} overflow-hidden`}>
           
           {/* Main Sidebar Content */}
-          <div className={`p-8 h-full flex flex-col transition-transform duration-500 ${isLangSelectorOpen || isOrientationSelectorOpen ? '-translate-x-full' : 'translate-x-0'}`}>
+          <div className={`p-8 h-full flex flex-col transition-transform duration-500 ${isLangSelectorOpen ? '-translate-x-full' : 'translate-x-0'}`}>
             <div className="flex justify-between items-center mb-10 pt-safe">
                 <div className="flex flex-col">
                     <img src={LOGO_URL} alt="OSM Logo" className="h-14 w-auto object-contain pr-4 select-none pointer-events-none" style={{ mixBlendMode: 'multiply' }} />
@@ -332,18 +301,6 @@ const App: React.FC = () => {
                     </div>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
                 </button>
-
-                {/* Orientation Selector Trigger */}
-                <button onClick={() => setIsOrientationSelectorOpen(true)} className="w-full flex items-center justify-between px-6 py-5 rounded-3xl bg-sky-50 border border-sky-100 hover:bg-sky-100 transition-all">
-                    <div className="flex items-center gap-4">
-                        <div className="text-sky-600">{selectedOrientation.icon}</div>
-                        <div className="flex flex-col items-start">
-                            <span className="text-[10px] font-black text-sky-400 uppercase tracking-widest">Display Mode</span>
-                            <span className="text-xs font-black text-slate-900">{selectedOrientation.name}</span>
-                        </div>
-                    </div>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
-                </button>
             </nav>
 
             <div className="pt-8 border-t border-slate-100 pb-safe">
@@ -368,31 +325,6 @@ const App: React.FC = () => {
                         <button key={lang.code} onClick={() => { setLanguage(lang.code); setIsLangSelectorOpen(false); }} className={`flex flex-col items-center justify-center p-5 rounded-3xl transition-all border aspect-square ${language === lang.code ? 'bg-green-600 border-green-500 text-white shadow-xl scale-[1.05] z-10' : 'bg-sky-50 border-sky-100 text-slate-600 hover:bg-sky-100'}`}>
                             <span className="text-3xl mb-3">{lang.flag}</span>
                             <span className="text-[10px] font-black uppercase tracking-widest text-center">{lang.name}</span>
-                        </button>
-                    ))}
-                </div>
-            </div>
-          </div>
-
-          {/* Orientation Selector Sub-page */}
-          <div className={`absolute inset-0 p-8 flex flex-col transition-transform duration-500 bg-white pt-safe ${isOrientationSelectorOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="flex items-center gap-4 mb-8">
-                <button onClick={() => setIsOrientationSelectorOpen(false)} className="p-2 hover:bg-sky-50 rounded-full text-slate-400 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
-                </button>
-                <h2 className="text-xl font-black uppercase tracking-tighter text-slate-900">Display Orientation</h2>
-            </div>
-            <div className="flex-1 overflow-y-auto no-scrollbar pb-safe">
-                <div className="flex flex-col gap-3 pb-8">
-                    {ORIENTATIONS.map((opt) => (
-                        <button key={opt.code} onClick={() => handleOrientationChange(opt.code as any)} className={`flex items-center gap-6 p-6 rounded-3xl transition-all border ${orientation === opt.code ? 'bg-sky-900 border-sky-800 text-white shadow-xl scale-[1.02] z-10' : 'bg-sky-50 border-sky-100 text-slate-600 hover:bg-sky-100'}`}>
-                            <div className={`p-4 rounded-2xl ${orientation === opt.code ? 'bg-white/10' : 'bg-white shadow-sm'}`}>{opt.icon}</div>
-                            <div className="flex flex-col items-start">
-                                <span className="text-sm font-black uppercase tracking-[0.1em]">{opt.name}</span>
-                                <span className={`text-[10px] font-bold ${orientation === opt.code ? 'text-sky-300' : 'text-slate-400'}`}>
-                                    {opt.code === 'any' ? 'Browser Controlled' : `Lock to ${opt.name}`}
-                                </span>
-                            </div>
                         </button>
                     ))}
                 </div>
