@@ -37,7 +37,7 @@ const App: React.FC = () => {
   const { 
     user, view, setView, login, finalizeLogin, signup, commitSignup, 
     logout, authError, isAuthLoading, getAllInterns, deleteIntern,
-    checkEmailExists, resetPassword, sessionVerified
+    checkEmailExists, resetPassword
   } = useAuth();
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -62,7 +62,7 @@ const App: React.FC = () => {
 
   const getInitialMessage = useCallback((): ChatMessage => ({
     id: `welcome-${chatSessionKey}-${Date.now()}`,
-    text: `Welcome to the OSM Service Portal. Ask me anything about vehicle troubleshooting or diagrams.`,
+    text: `Welcome to the OSM Service Portal. I am your specialized AI Assistant. Ask me anything about vehicle troubleshooting, relay diagrams, or fault codes.`,
     sender: 'bot',
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     suggestions: ["Relay Diagram", "Fuse Box Layout", "MCU Power Flow"]
@@ -86,7 +86,6 @@ const App: React.FC = () => {
     if (!deferredPrompt) return;
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-    console.log(`User response to the install prompt: ${outcome}`);
     setDeferredPrompt(null);
     setShowInstallPrompt(false);
   };
@@ -176,9 +175,11 @@ const App: React.FC = () => {
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
 
-    // Sync query to GAS for logging as requested ("user ask there quarry using [URL]")
+    // CONDITION D: LOG USER QUERY TO CLOUD (Script 2)
     if (user?.email) {
-        logUserQuery(user.email, user.name || 'Intern', text).catch(e => console.error("Query Log Failed", e));
+        logUserQuery(user.email, user.name || 'Intern', text, user.sessionId, user.mobile).catch(e => {
+            console.warn("Cloud activity logging deferred.");
+        });
     }
 
     try {
@@ -255,7 +256,7 @@ const App: React.FC = () => {
       {isRefreshing && (
         <div className="fixed inset-0 z-[100] bg-sky-900 flex flex-col items-center justify-center text-white animate-in fade-in duration-300">
            <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin mb-4"></div>
-           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white">System Resetting...</p>
+           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white">System Synchronizing...</p>
         </div>
       )}
 
@@ -269,7 +270,7 @@ const App: React.FC = () => {
             <div className="flex justify-between items-center mb-10 pt-safe">
                 <div className="flex flex-col">
                     <img src={LOGO_URL} alt="OSM Logo" className="h-14 w-auto object-contain pr-4 select-none pointer-events-none" style={{ mixBlendMode: 'multiply' }} />
-                    <span className="text-[10px] font-black text-sky-400 uppercase tracking-widest mt-2">Service Portal</span>
+                    <span className="text-[10px] font-black text-sky-400 uppercase tracking-widest mt-2">OSM Service Bot</span>
                 </div>
                 <button onClick={() => setIsSidebarOpen(false)} className="p-2 hover:bg-sky-50 rounded-full text-slate-400 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -279,13 +280,13 @@ const App: React.FC = () => {
             <nav className="flex-1 space-y-3 overflow-y-auto no-scrollbar">
                 <button onClick={() => { setShowAdminPanel(false); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black text-[11px] uppercase tracking-widest transition-all ${!showAdminPanel ? 'bg-green-600 text-white shadow-lg' : 'hover:bg-sky-50 text-slate-600'}`}>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
-                    Assistant
+                    Service Bot
                 </button>
 
                 {isAdmin && (
                     <button onClick={() => { setShowAdminPanel(true); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black text-[11px] uppercase tracking-widest transition-all ${showAdminPanel ? 'bg-green-600 text-white shadow-lg' : 'hover:bg-sky-50 text-slate-600'}`}>
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572-1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                        Admin Control
+                        Admin Dashboard
                     </button>
                 )}
 
@@ -296,7 +297,6 @@ const App: React.FC = () => {
 
                 <div className="py-2"></div>
 
-                {/* Language Selector Trigger */}
                 <button onClick={() => setIsLangSelectorOpen(true)} className="w-full flex items-center justify-between px-6 py-5 rounded-3xl bg-sky-50 border border-sky-100 hover:bg-sky-100 transition-all">
                     <div className="flex items-center gap-4">
                         <div className="text-xl">{selectedLang.flag}</div>
@@ -312,12 +312,11 @@ const App: React.FC = () => {
             <div className="pt-8 border-t border-slate-100 pb-safe">
                 <button onClick={handleLogoutAction} className="w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black text-[11px] uppercase tracking-widest text-red-500 hover:bg-red-50 transition-all">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                    Logout
+                    Logout Session
                 </button>
             </div>
           </div>
 
-          {/* Language Selector Sub-page */}
           <div className={`absolute inset-0 p-8 flex flex-col transition-transform duration-500 bg-white pt-safe ${isLangSelectorOpen ? 'translate-x-0' : 'translate-x-full'}`}>
             <div className="flex items-center gap-4 mb-8">
                 <button onClick={() => setIsLangSelectorOpen(false)} className="p-2 hover:bg-sky-50 rounded-full text-slate-400 transition-colors">
@@ -348,8 +347,8 @@ const App: React.FC = () => {
             <div className="flex flex-col">
               <img src={LOGO_URL} alt="OSM Logo" className="h-10 w-auto object-contain object-left pr-4 select-none pointer-events-none" style={{ mixBlendMode: 'multiply' }} />
               <div className="flex items-center gap-2 mt-1">
-                <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'success' && sessionVerified ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`}></div>
-                <p className="text-[8px] text-slate-400 font-black uppercase tracking-[0.2em]">{!sessionVerified ? 'Session Conflict' : (showAdminPanel ? 'Admin Mode' : 'Technical Support')}</p>
+                <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'success' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`}></div>
+                <p className="text-[8px] text-slate-400 font-black uppercase tracking-[0.2em]">{showAdminPanel ? 'Admin Mode' : 'Service Intelligence'}</p>
               </div>
             </div>
           </div>
@@ -366,10 +365,8 @@ const App: React.FC = () => {
             </button>
             
             <div className="flex items-center gap-3 pl-3 border-l border-sky-100">
-                <span className="hidden xs:inline text-[11px] font-black text-sky-900 uppercase tracking-tight">{user?.name}</span>
-                <div className="w-10 h-10 rounded-2xl bg-sky-900 flex items-center justify-center font-black text-sm text-white shadow-xl border-2 border-white relative">
+                <div className="w-10 h-10 rounded-2xl bg-sky-900 flex items-center justify-center font-black text-sm text-white shadow-xl border-2 border-white">
                   {user?.name?.[0] || 'U'}
-                  <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${sessionVerified ? 'bg-green-500' : 'bg-red-500 animate-ping'}`}></div>
                 </div>
             </div>
           </div>
@@ -378,18 +375,16 @@ const App: React.FC = () => {
       <main className="flex-1 overflow-hidden flex flex-col">
         {showAdminPanel && isAdmin ? (
           <div className="flex-1 flex flex-col relative overflow-hidden">
-            <div className="flex-1 overflow-hidden flex flex-col">
-              <AdminDashboard 
-                interns={getAllInterns()} 
-                onDeleteIntern={deleteIntern} 
-                kbFiles={kbFiles} 
-                onDeleteFile={handleDeleteFile} 
-                cloudData={masterSheetContent} 
-              />
-            </div>
+            <AdminDashboard 
+              interns={getAllInterns()} 
+              onDeleteIntern={deleteIntern} 
+              kbFiles={kbFiles} 
+              onDeleteFile={handleDeleteFile} 
+              cloudData={masterSheetContent} 
+            />
             <div className="absolute bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur-md border-t border-sky-100 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] z-40 flex items-center justify-between pb-safe">
                 <FileUpload onFilesStored={handleFilesStored} onError={(msg) => alert(msg)} />
-                <span className="hidden xs:inline text-[9px] font-black uppercase text-sky-400 tracking-widest ml-4">Management Hub</span>
+                <span className="hidden xs:inline text-[9px] font-black uppercase text-sky-400 tracking-widest ml-4">Knowledge Base Manager</span>
             </div>
           </div>
         ) : (
