@@ -13,7 +13,13 @@ import { matelEvKnowledgeBase } from './defaultLibrary';
 import { logUserQuery } from './services/otpService';
 import useAuth from './hooks/useAuth';
 
+/**
+ * ADMINISTRATIVE CONFIGURATION
+ * Update the MASTER_SHEET_URL below with your published Google Sheet CSV link.
+ * Format: File -> Share -> Publish to Web -> Link -> Comma-separated values (.csv)
+ */
 const ADMIN_EMAIL = 'research1@omegaseikimobility.com';
+const MASTER_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRbi-3Um2agWeTvsMt2D3F3HOAzNkqqQfjQdk4uqep53qjV6BnHIBXWVuhtfH8kzWsgdPsqaVi0CgtD/pub?output=csv";
 const FEEDBACK_URL = 'https://forms.gle/YcrerYAazwxi5zXL7';
 const LOGO_URL = "https://ik.imagekit.io/m8gcj8knd/white%20(with%20background).png";
 
@@ -116,7 +122,8 @@ const App: React.FC = () => {
   const fetchMasterSheet = useCallback(async () => {
     setSyncStatus('syncing');
     try {
-      const response = await fetch("https://docs.google.com/spreadsheets/d/e/2PACX-1vRbi-3Um2agWeTvsMt2D3F3HOAzNkqqQfjQdk4uqep53qjV6BnHIBXWVuhtfH8kzWsgdPsqaVi0CgtD/pub?output=csv");
+      // Fetching the Master Database from the published Google Sheet
+      const response = await fetch(MASTER_SHEET_URL);
       if (!response.ok) throw new Error("Cloud access denied");
       const csvData = await response.text();
       setMasterSheetContent(csvData);
@@ -175,7 +182,7 @@ const App: React.FC = () => {
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
 
-    // CONDITION D: LOG USER QUERY TO CLOUD (Script 2)
+    // CONDITION D: LOG USER QUERY TO CLOUD
     if (user?.email) {
         logUserQuery(user.email, user.name || 'Intern', text, user.sessionId, user.mobile).catch(e => {
             console.warn("Cloud activity logging deferred.");
@@ -347,8 +354,8 @@ const App: React.FC = () => {
             <div className="flex flex-col">
               <img src={LOGO_URL} alt="OSM Logo" className="h-10 w-auto object-contain object-left pr-4 select-none pointer-events-none" style={{ mixBlendMode: 'multiply' }} />
               <div className="flex items-center gap-2 mt-1">
-                <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'success' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`}></div>
-                <p className="text-[8px] text-slate-400 font-black uppercase tracking-[0.2em]">{showAdminPanel ? 'Admin Mode' : 'Service Intelligence'}</p>
+                <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'success' ? 'bg-green-500' : syncStatus === 'error' ? 'bg-red-500' : 'bg-yellow-500 animate-pulse'}`}></div>
+                <p className="text-[8px] text-slate-400 font-black uppercase tracking-[0.2em]">{syncStatus === 'syncing' ? 'Syncing Knowledge...' : showAdminPanel ? 'Admin Mode' : 'Service Intelligence'}</p>
               </div>
             </div>
           </div>

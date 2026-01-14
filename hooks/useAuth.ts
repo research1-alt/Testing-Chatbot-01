@@ -1,10 +1,10 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { hashPassword } from '../utils/crypto';
-import { logInternRegistration, syncSessionToCloud, fetchRemoteSessionId } from '../services/otpService';
+import { logInternRegistration, syncSessionToCloud, fetchRemoteSessionId, fetchUserFromCloud } from '../services/otpService';
 
-// Force Reset Key: Increment this string to force logout/re-signup for all users across all devices
-const STORAGE_VERSION = 'OSM_REL_2025_FORCED_RESET_V1';
+// Change this version string to force a global logout/reset for all users
+const STORAGE_VERSION = 'OSM_REL_2025_CROSS_DEVICE_FIX_V3.1';
 
 export type User = {
   name: string;
@@ -12,6 +12,7 @@ export type User = {
   sessionId: string;
   mobile?: string;
   registeredAt?: string;
+  password?: string; 
 };
 
 export type AuthCredentials = {
@@ -51,17 +52,17 @@ const useAuth = () => {
     if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) return;
     
     const remoteId = await fetchRemoteSessionId(email);
+    // If the session ID in the Google Sheet is different from this browser, log out.
     if (remoteId && remoteId !== localId && remoteId !== 'NOT_FOUND') {
       logout("⚠️ MULTI-DEVICE ALERT: Your account was just used to log in elsewhere. This device has been logged out.");
     }
   }, [logout, ADMIN_EMAIL]);
 
-  // Handle Forced Reset Logic: Wipes local data if app version has changed
+  // Handle Deployment Reset
   useEffect(() => {
     const currentStoredVersion = localStorage.getItem('osm_app_version');
     if (currentStoredVersion !== STORAGE_VERSION) {
-      console.log("[SYSTEM] New deployment detected. Wiping local data for security reset.");
-      localStorage.clear(); // Wipes BOTH current session AND the users database
+      localStorage.clear(); 
       localStorage.setItem('osm_app_version', STORAGE_VERSION);
       setUser(null);
       setView('intro');
@@ -81,7 +82,7 @@ const useAuth = () => {
         if (!checkIntervalRef.current) {
           checkIntervalRef.current = setInterval(() => {
             validateSessionCloud(currentUser.email, currentUser.sessionId);
-          }, 45000); // 45 second check
+          }, 45000); // Check every 45 seconds
         }
       } catch (e) {
         console.error("Session restore failed", e);
@@ -100,16 +101,15 @@ const useAuth = () => {
     const lowerEmail = userData.email.toLowerCase().trim();
     
     const userToAuth: User = { 
-        name: userData.name, 
+        name: userData.name || userData.userName, 
         email: lowerEmail,
         mobile: userData.mobile,
         sessionId: newSessionId 
     };
 
-    // LOG LOGIN ACTIVITY IMMEDIATELY to Script 2 (Activity Sheet)
     if (lowerEmail !== ADMIN_EMAIL.toLowerCase()) {
-      await syncSessionToCloud(lowerEmail, newSessionId, userData.name, userData.mobile).catch(err => {
-        console.warn("Cloud sync deferred, proceeding with local session.");
+      await syncSessionToCloud(lowerEmail, newSessionId, userToAuth.name, userToAuth.mobile).catch(err => {
+        console.warn("Cloud session sync deferred.");
       });
     }
 
@@ -128,22 +128,41 @@ const useAuth = () => {
         const hashedPassword = await hashPassword(password);
         const lowerEmail = email.toLowerCase().trim();
         
+        // 1. Admin Bypass
         if (lowerEmail === ADMIN_EMAIL.toLowerCase() && hashedPassword === ADMIN_HASH) {
             return { success: true, mfaRequired: false, tempUser: { name: 'Admin', email: ADMIN_EMAIL } };
         }
 
+        // 2. Local Database Check
         const storedUsers = JSON.parse(localStorage.getItem('users') || '[]');
-        const targetUser = storedUsers.find(
+        let targetUser = storedUsers.find(
             (u: any) => u.email.toLowerCase().trim() === lowerEmail && u.password === hashedPassword
         );
+
+        // 3. CLOUD DATABASE CHECK (Fixes the "Another Browser" issue)
+        if (!targetUser) {
+            const cloudUser = await fetchUserFromCloud(lowerEmail);
+            // Verify password hash against what's in the Google Sheet
+            if (cloudUser && cloudUser.password === hashedPassword) {
+                targetUser = {
+                    name: cloudUser.userName || cloudUser.name,
+                    email: cloudUser.email,
+                    mobile: cloudUser.mobile,
+                    password: cloudUser.password
+                };
+                // Sync to local for future offline use
+                const updatedUsers = [...storedUsers, targetUser];
+                localStorage.setItem('users', JSON.stringify(updatedUsers));
+            }
+        }
 
         if (targetUser) {
             return { success: true, mfaRequired: false, tempUser: targetUser };
         } else {
-            return { success: false, error: 'Incorrect email or password.' };
+            return { success: false, error: 'Mail id not registered or incorrect password.' };
         }
     } catch (e) {
-        return { success: false, error: "Auth process failed." };
+        return { success: false, error: "Auth sync failure. Check your connection." };
     } finally {
         setIsAuthLoading(false);
     }
@@ -158,20 +177,22 @@ const useAuth = () => {
     setIsAuthLoading(true);
     setAuthError(null);
     try {
-        const { name, email, mobile, password } = credentials;
-        if (!password || !name || !email || !mobile) throw new Error("Info missing");
-        if (!email.toLowerCase().trim().endsWith('@omegaseikimobility.com')) {
+        const { email } = credentials;
+        if (!email?.toLowerCase().trim().endsWith('@omegaseikimobility.com')) {
             setAuthError('Only @omegaseikimobility.com allowed.');
             return false;
         }
-        const users = JSON.parse(localStorage.getItem('users') || '[]');
-        if (users.some((u: any) => u.email.toLowerCase().trim() === email.toLowerCase().trim())) {
-            setAuthError('Email already registered.');
+        
+        // Prevent signup if already exists in Cloud
+        const cloudCheck = await fetchUserFromCloud(email);
+        if (cloudCheck) {
+            setAuthError('Mail id already exists in our system.');
             return false;
         }
+
         return true; 
     } catch (e) {
-        setAuthError("Validation error.");
+        setAuthError("Registry verification error.");
         return false;
     } finally {
         setIsAuthLoading(false);
@@ -193,11 +214,12 @@ const useAuth = () => {
         users.push(newUser);
         localStorage.setItem('users', JSON.stringify(users));
         
-        // LOG TO SCRIPT 1 (Registrations Sheet)
+        // Send to Script 1
         await logInternRegistration({
             email: newUser.email,
             mobile: newUser.mobile || '',
             userName: newUser.name || '',
+            password: hashedPassword, // MUST save hash for cross-device login
             emailCode: 'SIGNUP'
         });
         return true;
@@ -208,9 +230,21 @@ const useAuth = () => {
     try {
         const users = JSON.parse(localStorage.getItem('users') || '[]');
         const userIndex = users.findIndex((u: any) => u.email.toLowerCase().trim() === email.toLowerCase().trim());
-        if (userIndex === -1) return false;
-        users[userIndex].password = await hashPassword(newPassword);
-        localStorage.setItem('users', JSON.stringify(users));
+        const hashedPassword = await hashPassword(newPassword);
+        
+        if (userIndex !== -1) {
+            users[userIndex].password = hashedPassword;
+            localStorage.setItem('users', JSON.stringify(users));
+        }
+        
+        await logInternRegistration({
+            email: email.toLowerCase().trim(),
+            mobile: 'RECOVERY',
+            userName: 'RECOVERY',
+            password: hashedPassword,
+            emailCode: 'RESET'
+        });
+
         return true;
     } catch (e) { return false; }
   }, []);
