@@ -10,6 +10,7 @@ import { ChatMessage } from './types';
 import { getChatbotResponse } from './services/geminiService';
 import { addFile, getAllFiles, StoredFile, deleteFile } from './utils/db';
 import { matelEvKnowledgeBase } from './defaultLibrary';
+import { logUserQuery } from './services/otpService';
 import useAuth from './hooks/useAuth';
 
 const ADMIN_EMAIL = 'research1@omegaseikimobility.com';
@@ -36,7 +37,7 @@ const App: React.FC = () => {
   const { 
     user, view, setView, login, finalizeLogin, signup, commitSignup, 
     logout, authError, isAuthLoading, getAllInterns, deleteIntern,
-    checkEmailExists, resetPassword
+    checkEmailExists, resetPassword, sessionVerified
   } = useAuth();
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -174,6 +175,11 @@ const App: React.FC = () => {
 
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
+
+    // Sync query to GAS for logging as requested ("user ask there quarry using [URL]")
+    if (user?.email) {
+        logUserQuery(user.email, user.name || 'Intern', text).catch(e => console.error("Query Log Failed", e));
+    }
 
     try {
       const history = messages
@@ -342,8 +348,8 @@ const App: React.FC = () => {
             <div className="flex flex-col">
               <img src={LOGO_URL} alt="OSM Logo" className="h-10 w-auto object-contain object-left pr-4 select-none pointer-events-none" style={{ mixBlendMode: 'multiply' }} />
               <div className="flex items-center gap-2 mt-1">
-                <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'success' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`}></div>
-                <p className="text-[8px] text-slate-400 font-black uppercase tracking-[0.2em]">{showAdminPanel ? 'Admin Mode' : 'Technical Support'}</p>
+                <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'success' && sessionVerified ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`}></div>
+                <p className="text-[8px] text-slate-400 font-black uppercase tracking-[0.2em]">{!sessionVerified ? 'Session Conflict' : (showAdminPanel ? 'Admin Mode' : 'Technical Support')}</p>
               </div>
             </div>
           </div>
@@ -361,8 +367,9 @@ const App: React.FC = () => {
             
             <div className="flex items-center gap-3 pl-3 border-l border-sky-100">
                 <span className="hidden xs:inline text-[11px] font-black text-sky-900 uppercase tracking-tight">{user?.name}</span>
-                <div className="w-10 h-10 rounded-2xl bg-sky-900 flex items-center justify-center font-black text-sm text-white shadow-xl border-2 border-white">
+                <div className="w-10 h-10 rounded-2xl bg-sky-900 flex items-center justify-center font-black text-sm text-white shadow-xl border-2 border-white relative">
                   {user?.name?.[0] || 'U'}
+                  <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${sessionVerified ? 'bg-green-500' : 'bg-red-500 animate-ping'}`}></div>
                 </div>
             </div>
           </div>

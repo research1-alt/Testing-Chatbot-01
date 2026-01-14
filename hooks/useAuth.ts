@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { hashPassword } from '../utils/crypto';
-import { logInternRegistration } from '../services/otpService';
+import { logInternRegistration, syncSessionToCloud, fetchRemoteSessionId } from '../services/otpService';
 
 export type User = {
   name: string;
@@ -30,6 +30,7 @@ const useAuth = () => {
   const [view, setView] = useState<'intro' | 'auth' | 'chat'>('intro');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [sessionVerified, setSessionVerified] = useState(true);
 
   const ADMIN_HASH = '3970b54203666f884a4411130e9d6b2c2560e9063d83811801267b1860882736';
   const ADMIN_EMAIL = 'research1@omegaseikimobility.com';
@@ -40,17 +41,30 @@ const useAuth = () => {
     setView('auth');
   }, []);
 
+  // Remote Session Heartbeat: Checks the cloud every 60 seconds
+  useEffect(() => {
+    if (!user || user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) return;
+
+    const interval = setInterval(async () => {
+      const remoteId = await fetchRemoteSessionId(user.email);
+      if (remoteId && remoteId !== user.sessionId) {
+        setSessionVerified(false);
+        logout();
+        alert("Security Alert: Your account was accessed from another device. This session has been closed.");
+      }
+    }, 60000); // Check every minute
+
+    return () => clearInterval(interval);
+  }, [user, logout, ADMIN_EMAIL]);
+
   useEffect(() => {
     const checkSession = () => {
       const currentUserStr = localStorage.getItem('currentUser');
-      if (!currentUserStr) {
-        return;
-      }
+      if (!currentUserStr) return;
 
       try {
         const currentUser = JSON.parse(currentUserStr);
         const allUsers = JSON.parse(localStorage.getItem('users') || '[]');
-        
         const globalUser = allUsers.find((u: any) => u.email.toLowerCase() === currentUser.email.toLowerCase());
         
         if (currentUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
@@ -61,7 +75,7 @@ const useAuth = () => {
 
         if (globalUser && globalUser.sessionId !== currentUser.sessionId) {
           logout();
-          alert("Session Expired: Account accessed from another device/session.");
+          alert("Session Expired: You have logged in on another browser or device.");
         } else if (globalUser) {
           setUser(currentUser);
           setView('chat');
@@ -73,15 +87,13 @@ const useAuth = () => {
 
     checkSession();
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'currentUser') {
-        checkSession();
-      }
+      if (e.key === 'currentUser') checkSession();
     };
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
   }, [logout, ADMIN_EMAIL]);
 
-  const finalizeLogin = useCallback((userData: any) => {
+  const finalizeLogin = useCallback(async (userData: any) => {
     const newSessionId = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
     const storedUsers = JSON.parse(localStorage.getItem('users') || '[]');
     const lowerEmail = userData.email.toLowerCase();
@@ -99,10 +111,15 @@ const useAuth = () => {
         localStorage.setItem('users', JSON.stringify(storedUsers));
     }
 
+    // PUSH TO CLOUD: Claims this session globally
+    if (lowerEmail !== ADMIN_EMAIL.toLowerCase()) {
+        await syncSessionToCloud(lowerEmail, newSessionId);
+    }
+
     localStorage.setItem('currentUser', JSON.stringify(userToAuth));
     setUser(userToAuth);
     setView('chat');
-  }, []);
+  }, [ADMIN_EMAIL]);
 
   const login = useCallback(async (credentials: AuthCredentials): Promise<LoginResult> => {
     setIsAuthLoading(true);
@@ -228,7 +245,7 @@ const useAuth = () => {
   return { 
     user, view, setView, login, finalizeLogin, signup, commitSignup, 
     logout, authError, isAuthLoading, getAllInterns, deleteIntern,
-    checkEmailExists, resetPassword
+    checkEmailExists, resetPassword, sessionVerified
   };
 };
 
