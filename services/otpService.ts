@@ -44,8 +44,9 @@ const postToGoogle = async (payload: any): Promise<boolean> => {
 
 export const fetchUserFromCloud = async (email: string): Promise<any | null> => {
     try {
-        const url = `${GATEWAY_URL}?action=get_user&email=${encodeURIComponent(email.toLowerCase().trim())}&t=${Date.now()}`;
-        const response = await fetch(url);
+        const lowerEmail = email.toLowerCase().trim();
+        const url = `${GATEWAY_URL}?action=get_user&email=${encodeURIComponent(lowerEmail)}&_t=${Date.now()}&_rnd=${Math.random()}`;
+        const response = await fetch(url, { cache: 'no-store' });
         if (!response.ok) return null;
         const data = await response.json();
         return data.success ? data.user : null;
@@ -87,14 +88,14 @@ export const logUserQuery = async (email: string, userName: string, query: strin
 
 export const fetchRemoteSessionId = async (email: string): Promise<string | null> => {
     try {
-        // We use a cache buster timestamp to ensure we get the real-time session status
-        const url = `${GATEWAY_URL}?action=check_session&email=${encodeURIComponent(email.toLowerCase().trim())}&t=${Date.now()}`;
-        const response = await fetch(url);
+        const lowerEmail = email.toLowerCase().trim();
+        const url = `${GATEWAY_URL}?action=check_session&email=${encodeURIComponent(lowerEmail)}&_nocache=${Date.now()}`;
+        const response = await fetch(url, { cache: 'no-store' });
         if (!response.ok) return null;
         const rawText = await response.text();
         const cleanId = rawText.trim();
-        // If the script returns an error page or isn't found
-        if (cleanId === 'NOT_FOUND' || cleanId.includes('<!DOCTYPE') || cleanId.length < 5) return null;
+        
+        if (cleanId === 'NOT_FOUND' || cleanId.startsWith('<!DOCTYPE') || cleanId.length < 5) return null;
         return cleanId;
     } catch (e) {
         return null;

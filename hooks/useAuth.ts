@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { hashPassword } from '../utils/crypto';
 import { logInternRegistration, syncSessionToCloud, fetchRemoteSessionId, fetchUserFromCloud } from '../services/otpService';
 
-const STORAGE_VERSION = 'OSM_REL_2025_V5_STRICT';
+const STORAGE_VERSION = 'OSM_REL_2025_V7_STRICT_SYNC';
 
 export type User = {
   name: string;
@@ -45,40 +45,40 @@ const useAuth = () => {
     localStorage.removeItem('currentUser');
     setUser(null);
     setView('auth');
-    if (reason) alert(reason);
+    if (reason) {
+        setTimeout(() => alert(reason), 100);
+    }
   }, []);
 
   const validateSessionCloud = useCallback(async (email: string, localId: string) => {
-    // Admins are exempt from multi-device locking for management purposes
     if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) return;
     if (isCheckingRef.current) return;
     
     isCheckingRef.current = true;
     try {
         const remoteId = await fetchRemoteSessionId(email);
-        // If someone else logged in, the remoteId in the cloud will be different from our localId
         if (remoteId && remoteId !== localId && remoteId !== 'NOT_FOUND') {
-          logout("⚠️ SECURITY ALERT: Your account was logged in on another device. This session has been terminated.");
+          logout("⚠️ SESSION TERMINATED: You have logged in on another device. Only one device can be active at a time.");
         }
     } catch (e) {
-        console.warn("Session check failed, skipping heartbeat.");
+        // Network hiccup, do not logout
     } finally {
         isCheckingRef.current = false;
     }
   }, [logout, ADMIN_EMAIL]);
 
-  // Handle versioning to clear old local storage bugs
   useEffect(() => {
     const currentStoredVersion = localStorage.getItem('osm_app_version');
     if (currentStoredVersion !== STORAGE_VERSION) {
+      const users = localStorage.getItem('users');
       localStorage.clear(); 
+      if (users) localStorage.setItem('users', users); // Preserve registry
       localStorage.setItem('osm_app_version', STORAGE_VERSION);
       setUser(null);
       setView('intro');
     }
   }, []);
 
-  // Main session lifecycle
   useEffect(() => {
     const initializeAuth = async () => {
       const currentUserStr = localStorage.getItem('currentUser');
@@ -89,14 +89,12 @@ const useAuth = () => {
         setUser(currentUser);
         setView('chat');
 
-        // Initial immediate check
         await validateSessionCloud(currentUser.email, currentUser.sessionId);
 
         if (!checkIntervalRef.current) {
-          // Check every 10 seconds for device conflicts
           checkIntervalRef.current = setInterval(() => {
             validateSessionCloud(currentUser.email, currentUser.sessionId);
-          }, 10000);
+          }, 5000);
         }
       } catch (e) {
         console.error("Auth restore error", e);
@@ -105,23 +103,23 @@ const useAuth = () => {
 
     initializeAuth();
 
-    // Re-check when the user switches tabs back to the app
-    const handleVisibilityChange = () => {
-        if (document.visibilityState === 'visible' && user) {
-            validateSessionCloud(user.email, user.sessionId);
+    const handleFocus = () => {
+        const currentUserStr = localStorage.getItem('currentUser');
+        if (currentUserStr) {
+            const parsed = JSON.parse(currentUserStr);
+            validateSessionCloud(parsed.email, parsed.sessionId);
         }
     };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
 
+    window.addEventListener('focus', handleFocus);
     return () => { 
         if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('focus', handleFocus);
     };
-  }, [logout, validateSessionCloud, user]);
+  }, [logout, validateSessionCloud]);
 
   const finalizeLogin = useCallback(async (userData: any) => {
-    // Create a truly unique ID for this specific login instance
-    const newSessionId = "SID_" + Math.random().toString(36).substring(2, 10) + "_" + Date.now();
+    const newSessionId = "SID_" + Date.now() + "_" + Math.random().toString(36).substring(2, 12);
     const lowerEmail = userData.email.toLowerCase().trim();
     
     const userToAuth: User = { 
@@ -131,7 +129,6 @@ const useAuth = () => {
         sessionId: newSessionId 
     };
 
-    // Inform cloud that THIS session is now the only active one
     if (lowerEmail !== ADMIN_EMAIL.toLowerCase()) {
       await syncSessionToCloud(lowerEmail, newSessionId, userToAuth.name, userToAuth.mobile);
     }
@@ -150,20 +147,28 @@ const useAuth = () => {
         const hashedPassword = await hashPassword(password || '');
         const lowerEmail = email.toLowerCase().trim();
         
-        // Admin override
+        // Admin check
         if (lowerEmail === ADMIN_EMAIL.toLowerCase() && hashedPassword === ADMIN_HASH) {
             return { success: true, tempUser: { name: 'Admin', email: ADMIN_EMAIL } };
         }
 
-        // Validate credentials against Cloud DB
+        // 1. Check Cloud Registry (Primary Source)
         const cloudUser = await fetchUserFromCloud(lowerEmail);
         if (cloudUser && cloudUser.password === hashedPassword) {
             return { success: true, tempUser: cloudUser };
-        } else {
-            return { success: false, error: 'Identity check failed. Invalid email or password.' };
         }
+
+        // 2. Fallback: Check Local Registry (For immediate login after signup)
+        const localUsers = JSON.parse(localStorage.getItem('users') || '[]');
+        const localMatch = localUsers.find((u: any) => u.email.toLowerCase().trim() === lowerEmail);
+        
+        if (localMatch && localMatch.password === hashedPassword) {
+            return { success: true, tempUser: localMatch };
+        }
+
+        return { success: false, error: 'Identity check failed. Please check your email and password.' };
     } catch (e) {
-        return { success: false, error: "Network fault. Please ensure your internet is active." };
+        return { success: false, error: "Authentication system error. Please try again." };
     } finally {
         setIsAuthLoading(false);
     }
@@ -171,15 +176,16 @@ const useAuth = () => {
 
   const checkEmailExists = useCallback((email: string) => {
     const users = JSON.parse(localStorage.getItem('users') || '[]');
-    return users.find((u: any) => u.email.toLowerCase() === email.toLowerCase()) || null;
+    return users.find((u: any) => u.email.toLowerCase().trim() === email.toLowerCase().trim()) || null;
   }, []);
 
   const signup = useCallback(async (credentials: AuthCredentials) => {
     setIsAuthLoading(true);
     try {
-        const cloudCheck = await fetchUserFromCloud(credentials.email);
+        const lowerEmail = credentials.email.toLowerCase().trim();
+        const cloudCheck = await fetchUserFromCloud(lowerEmail);
         if (cloudCheck) {
-            setAuthError('Identity already exists in registry.');
+            setAuthError('This email is already registered.');
             return false;
         }
         return true; 
@@ -189,24 +195,32 @@ const useAuth = () => {
 
   const commitSignup = useCallback(async (credentials: AuthCredentials) => {
     try {
+        const lowerEmail = credentials.email.toLowerCase().trim();
         const hashedPassword = await hashPassword(credentials.password || '');
         const newUser = { 
             userName: credentials.name, 
-            email: credentials.email.toLowerCase().trim(), 
+            email: lowerEmail, 
             mobile: credentials.mobile, 
             password: hashedPassword 
         };
         
+        // Push to cloud
         await logInternRegistration({
             email: newUser.email,
             mobile: newUser.mobile || '',
             userName: newUser.userName || '',
             password: hashedPassword,
-            emailCode: 'REG'
+            emailCode: 'REG_NEW'
         });
 
+        // Push to local storage immediately
         const localUsers = JSON.parse(localStorage.getItem('users') || '[]');
-        localUsers.push(newUser);
+        const existingIdx = localUsers.findIndex((u: any) => u.email.toLowerCase().trim() === lowerEmail);
+        if (existingIdx >= 0) {
+            localUsers[existingIdx] = newUser;
+        } else {
+            localUsers.push(newUser);
+        }
         localStorage.setItem('users', JSON.stringify(localUsers));
 
         return true;
@@ -215,14 +229,25 @@ const useAuth = () => {
 
   const resetPassword = useCallback(async (email: string, newPassword: string): Promise<boolean> => {
     try {
+        const lowerEmail = email.toLowerCase().trim();
         const hashedPassword = await hashPassword(newPassword);
+        
         await logInternRegistration({
-            email: email.toLowerCase().trim(),
+            email: lowerEmail,
             mobile: 'RECOVERY',
             userName: 'RECOVERY',
             password: hashedPassword,
-            emailCode: 'RESET'
+            emailCode: 'RESET_PWD'
         });
+
+        // Also update locally to allow instant login
+        const localUsers = JSON.parse(localStorage.getItem('users') || '[]');
+        const idx = localUsers.findIndex((u: any) => u.email.toLowerCase().trim() === lowerEmail);
+        if (idx >= 0) {
+            localUsers[idx].password = hashedPassword;
+            localStorage.setItem('users', JSON.stringify(localUsers));
+        }
+
         return true;
     } catch (e) { return false; }
   }, []);
