@@ -296,7 +296,7 @@ This document is a comprehensive guide based on the official MATEL electric vehi
 `;
 
 const IssueorDiagnosticDocumentContent = `
-# Error - Diagnostic Document
+# Error - Diagnostic Document (Error List)
 
 This document provides a comprehensive list of Error codes, their descriptions, definitions, occurrence conditions, and troubleshooting steps.
 
