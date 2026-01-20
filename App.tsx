@@ -13,6 +13,11 @@ import { matelEvKnowledgeBase } from './defaultLibrary';
 import { logUserQuery } from './services/otpService';
 import useAuth from './hooks/useAuth';
 
+/**
+ * ADMINISTRATIVE CONFIGURATION
+ * Update the MASTER_SHEET_URL below with your published Google Sheet CSV link.
+ * Format: File -> Share -> Publish to Web -> Link -> Comma-separated values (.csv)
+ */
 const ADMIN_EMAIL = 'research1@omegaseikimobility.com';
 const MASTER_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRbi-3Um2agWeTvsMt2D3F3HOAzNkqqQfjQdk4uqep53qjV6BnHIBXWVuhtfH8kzWsgdPsqaVi0CgtD/pub?output=csv";
 const FEEDBACK_URL = 'https://forms.gle/YcrerYAazwxi5zXL7';
@@ -38,7 +43,7 @@ const App: React.FC = () => {
   const { 
     user, view, setView, login, finalizeLogin, signup, commitSignup, 
     logout, authError, isAuthLoading, getAllInterns, deleteIntern,
-    checkEmailExists, resetPassword, validateSessionCloud, isSessionRevoked
+    checkEmailExists, resetPassword
   } = useAuth();
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -54,6 +59,8 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLangSelectorOpen, setIsLangSelectorOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
+
+  // PWA Install Prompt State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
 
@@ -73,13 +80,18 @@ const App: React.FC = () => {
       setDeferredPrompt(e);
       setShowInstallPrompt(true);
     };
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
   }, []);
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
     deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
     setDeferredPrompt(null);
     setShowInstallPrompt(false);
   };
@@ -102,14 +114,22 @@ const App: React.FC = () => {
     logout();
   }, [logout]);
 
+  const handleFeedbackClick = () => {
+    window.open(FEEDBACK_URL, '_blank');
+    setIsSidebarOpen(false);
+  };
+
   const fetchMasterSheet = useCallback(async () => {
     setSyncStatus('syncing');
     try {
+      // Fetching the Master Database from the published Google Sheet
       const response = await fetch(MASTER_SHEET_URL);
+      if (!response.ok) throw new Error("Cloud access denied");
       const csvData = await response.text();
       setMasterSheetContent(csvData);
       setSyncStatus('success');
     } catch (err) {
+      console.error("OSM Sync Error:", err);
       setSyncStatus('error');
     }
   }, []);
@@ -119,14 +139,18 @@ const App: React.FC = () => {
     try {
       let storedFiles = await getAllFiles();
       if (storedFiles.length === 0) {
-        for (const file of matelEvKnowledgeBase) await addFile(file);
+        for (const file of matelEvKnowledgeBase) {
+          await addFile(file);
+        }
         storedFiles = await getAllFiles();
       }
       setKbFiles(storedFiles);
-      const combined = storedFiles.map(f => `FILE: ${f.name}\n---\n${f.content}\n---`).join('\n\n');
+      const combined = storedFiles
+        .map(f => `FILE: ${f.name}\n---\n${f.content}\n---`)
+        .join('\n\n');
       setKbContent(combined);
     } catch (err) {
-      console.error(err);
+      console.error("Local KB Error:", err);
     } finally {
       setIsKbLoading(false);
     }
@@ -140,17 +164,13 @@ const App: React.FC = () => {
   }, [view, loadKnowledgeBase, fetchMasterSheet]);
 
   useEffect(() => {
-    if (view === 'chat' && !isRefreshing) setMessages([getInitialMessage()]);
+    if (view === 'chat' && !isRefreshing) {
+        setMessages([getInitialMessage()]);
+    }
   }, [view, chatSessionKey, getInitialMessage, isRefreshing]);
 
   const handleSendMessage = async (text: string) => {
-    if (!text.trim() || isLoading || isRefreshing || isSessionRevoked) return;
-
-    // MANDATORY PRE-FLIGHT SESSION CHECK
-    if (user) {
-      const isStillValid = await validateSessionCloud(user.email, user.sessionId);
-      if (!isStillValid) return;
-    }
+    if (!text.trim() || isLoading || isRefreshing) return;
 
     const userMsg: ChatMessage = {
       id: `u-${Date.now()}`,
@@ -162,14 +182,23 @@ const App: React.FC = () => {
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
 
+    // CONDITION D: LOG USER QUERY TO CLOUD
     if (user?.email) {
-        logUserQuery(user.email, user.name || 'Intern', text, user.sessionId, user.mobile).catch(() => {});
+        logUserQuery(user.email, user.name || 'Intern', text, user.sessionId, user.mobile).catch(e => {
+            console.warn("Cloud activity logging deferred.");
+        });
     }
 
     try {
-      const history = messages.slice(-6).map(m => `${m.sender === 'bot' ? 'Assistant' : 'Technician'}: ${m.text}`).join('\n');
+      const history = messages
+        .slice(-6)
+        .map(m => `${m.sender === 'bot' ? 'Assistant' : 'Technician'}: ${m.text}`)
+        .join('\n');
+
       const fullContext = `[OSM MASTER DATABASE]\n${masterSheetContent}\n\n[SUPPLEMENTAL MANUALS]\n${kbContent}`;
+      
       const response = await getChatbotResponse(text, fullContext, history, language);
+      
       const botMsg: ChatMessage = {
         id: `b-${Date.now()}`,
         text: response.answer,
@@ -178,11 +207,12 @@ const App: React.FC = () => {
         suggestions: response.suggestions,
         unclear: response.isUnclear
       };
+
       setMessages(prev => [...prev, botMsg]);
     } catch (err: any) {
       setMessages(prev => [...prev, {
         id: `err-${Date.now()}`,
-        text: `Analysis error. Please re-state query.`,
+        text: `Error analyzing technical data: ${err.message}`,
         sender: 'bot',
         timestamp: new Date().toLocaleTimeString(),
       }]);
@@ -223,18 +253,11 @@ const App: React.FC = () => {
   return (
     <div className="flex flex-col h-full max-w-5xl mx-auto border-x bg-sky-50 shadow-2xl overflow-hidden font-sans text-slate-900 relative">
       
-      {isSessionRevoked && (
-        <div className="fixed inset-0 z-[200] bg-slate-900/90 backdrop-blur-xl flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
-          <div className="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center text-white mb-6 shadow-2xl animate-bounce">
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-          </div>
-          <h2 className="text-3xl font-black text-white uppercase tracking-tight mb-4">Session Revoked</h2>
-          <p className="text-slate-300 font-bold uppercase tracking-widest text-sm max-w-sm">Another device has logged into this account. You are being redirected to the login screen for your security.</p>
-        </div>
-      )}
-
       {showInstallPrompt && (
-        <InstallPrompt onInstall={handleInstallClick} onDismiss={() => setShowInstallPrompt(false)} />
+        <InstallPrompt 
+          onInstall={handleInstallClick} 
+          onDismiss={() => setShowInstallPrompt(false)} 
+        />
       )}
 
       {isRefreshing && (
@@ -244,9 +267,12 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {/* Sidebar Overlay */}
       <div className={`fixed inset-0 z-50 transition-all duration-500 ${isSidebarOpen ? 'visible' : 'invisible'}`}>
         <div className={`absolute inset-0 bg-slate-900/40 backdrop-blur-md transition-opacity duration-500 ${isSidebarOpen ? 'opacity-100' : 'opacity-0'}`} onClick={() => { setIsSidebarOpen(false); setIsLangSelectorOpen(false); }}></div>
         <aside className={`absolute top-0 left-0 h-full w-[70vw] sm:w-80 bg-white shadow-2xl transition-transform duration-500 transform ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} overflow-hidden`}>
+          
+          {/* Main Sidebar Content */}
           <div className={`p-8 h-full flex flex-col transition-transform duration-500 ${isLangSelectorOpen ? '-translate-x-full' : 'translate-x-0'}`}>
             <div className="flex justify-between items-center mb-10 pt-safe">
                 <div className="flex flex-col">
@@ -257,21 +283,27 @@ const App: React.FC = () => {
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
             </div>
+
             <nav className="flex-1 space-y-3 overflow-y-auto no-scrollbar">
                 <button onClick={() => { setShowAdminPanel(false); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black text-[11px] uppercase tracking-widest transition-all ${!showAdminPanel ? 'bg-green-600 text-white shadow-lg' : 'hover:bg-sky-50 text-slate-600'}`}>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
                     Service Bot
                 </button>
+
                 {isAdmin && (
                     <button onClick={() => { setShowAdminPanel(true); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black text-[11px] uppercase tracking-widest transition-all ${showAdminPanel ? 'bg-green-600 text-white shadow-lg' : 'hover:bg-sky-50 text-slate-600'}`}>
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572-1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                         Admin Dashboard
                     </button>
                 )}
-                <button type="button" onClick={() => window.open(FEEDBACK_URL, '_blank')} className="w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black text-[11px] uppercase tracking-widest text-slate-600 hover:bg-sky-50 transition-all border border-slate-100 active:bg-sky-100">
+
+                <button type="button" onClick={handleFeedbackClick} className="w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black text-[11px] uppercase tracking-widest text-slate-600 hover:bg-sky-50 transition-all border border-slate-100 active:bg-sky-100">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
                     Send Feedback
                 </button>
+
+                <div className="py-2"></div>
+
                 <button onClick={() => setIsLangSelectorOpen(true)} className="w-full flex items-center justify-between px-6 py-5 rounded-3xl bg-sky-50 border border-sky-100 hover:bg-sky-100 transition-all">
                     <div className="flex items-center gap-4">
                         <div className="text-xl">{selectedLang.flag}</div>
@@ -283,6 +315,7 @@ const App: React.FC = () => {
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
                 </button>
             </nav>
+
             <div className="pt-8 border-t border-slate-100 pb-safe">
                 <button onClick={handleLogoutAction} className="w-full flex items-center gap-4 px-6 py-4 rounded-3xl font-black text-[11px] uppercase tracking-widest text-red-500 hover:bg-red-50 transition-all">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
@@ -290,6 +323,7 @@ const App: React.FC = () => {
                 </button>
             </div>
           </div>
+
           <div className={`absolute inset-0 p-8 flex flex-col transition-transform duration-500 bg-white pt-safe ${isLangSelectorOpen ? 'translate-x-0' : 'translate-x-full'}`}>
             <div className="flex items-center gap-4 mb-8">
                 <button onClick={() => setIsLangSelectorOpen(false)} className="p-2 hover:bg-sky-50 rounded-full text-slate-400 transition-colors">
@@ -308,6 +342,7 @@ const App: React.FC = () => {
                 </div>
             </div>
           </div>
+
         </aside>
       </div>
 
@@ -324,12 +359,22 @@ const App: React.FC = () => {
               </div>
             </div>
           </div>
+          
           <div className="flex items-center gap-2">
-            <button onClick={handleReloadApp} className="p-2.5 bg-sky-50 hover:bg-sky-100 active:bg-sky-200 border border-sky-100 rounded-full text-sky-600 transition-all shadow-sm group active:scale-90">
-              <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            <button 
+              onClick={handleReloadApp}
+              className="p-2.5 bg-sky-50 hover:bg-sky-100 active:bg-sky-200 border border-sky-100 rounded-full text-sky-600 transition-all shadow-sm group active:scale-90"
+              title="Refresh Application"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
             </button>
+            
             <div className="flex items-center gap-3 pl-3 border-l border-sky-100">
-                <div className="w-10 h-10 rounded-2xl bg-sky-900 flex items-center justify-center font-black text-sm text-white shadow-xl border-2 border-white">{user?.name?.[0] || 'U'}</div>
+                <div className="w-10 h-10 rounded-2xl bg-sky-900 flex items-center justify-center font-black text-sm text-white shadow-xl border-2 border-white">
+                  {user?.name?.[0] || 'U'}
+                </div>
             </div>
           </div>
       </header>
@@ -337,14 +382,29 @@ const App: React.FC = () => {
       <main className="flex-1 overflow-hidden flex flex-col">
         {showAdminPanel && isAdmin ? (
           <div className="flex-1 flex flex-col relative overflow-hidden">
-            <AdminDashboard interns={getAllInterns()} onDeleteIntern={deleteIntern} kbFiles={kbFiles} onDeleteFile={handleDeleteFile} cloudData={masterSheetContent} />
+            <AdminDashboard 
+              interns={getAllInterns()} 
+              onDeleteIntern={deleteIntern} 
+              kbFiles={kbFiles} 
+              onDeleteFile={handleDeleteFile} 
+              cloudData={masterSheetContent} 
+            />
             <div className="absolute bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur-md border-t border-sky-100 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] z-40 flex items-center justify-between pb-safe">
                 <FileUpload onFilesStored={handleFilesStored} onError={(msg) => alert(msg)} />
                 <span className="hidden xs:inline text-[9px] font-black uppercase text-sky-400 tracking-widest ml-4">Knowledge Base Manager</span>
             </div>
           </div>
         ) : (
-          <ChatWindow key={`session-v${chatSessionKey}`} messages={messages} onSendMessage={handleSendMessage} isLoading={isLoading} isKbLoading={isKbLoading || syncStatus === 'syncing'} selectedLanguage={language} onOpenVideo={() => {}} showVideoAction={false} />
+          <ChatWindow 
+            key={`session-v${chatSessionKey}`} 
+            messages={messages} 
+            onSendMessage={handleSendMessage} 
+            isLoading={isLoading} 
+            isKbLoading={isKbLoading || syncStatus === 'syncing'} 
+            selectedLanguage={language} 
+            onOpenVideo={() => {}} 
+            showVideoAction={false} 
+          />
         )}
       </main>
     </div>
