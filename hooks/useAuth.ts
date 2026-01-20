@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { hashPassword } from '../utils/crypto';
 import { logInternRegistration, syncSessionToCloud, fetchRemoteSessionId, fetchUserFromCloud } from '../services/otpService';
 
-const STORAGE_VERSION = 'OSM_REL_2025_V4_LOCK';
+const STORAGE_VERSION = 'OSM_REL_2025_V5_STRICT';
 
 export type User = {
   name: string;
@@ -35,6 +35,8 @@ const useAuth = () => {
   const [authError, setAuthError] = useState<string | null>(null);
   
   const checkIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isCheckingRef = useRef(false);
+  
   const ADMIN_EMAIL = 'research1@omegaseikimobility.com';
   const ADMIN_HASH = '3970b54203666f884a4411130e9d6b2c2560e9063d83811801267b1860882736';
 
@@ -47,15 +49,25 @@ const useAuth = () => {
   }, []);
 
   const validateSessionCloud = useCallback(async (email: string, localId: string) => {
+    // Admins are exempt from multi-device locking for management purposes
     if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) return;
+    if (isCheckingRef.current) return;
     
-    const remoteId = await fetchRemoteSessionId(email);
-    // If someone else logged in, the remoteId will have changed.
-    if (remoteId && remoteId !== localId && remoteId !== 'NOT_FOUND') {
-      logout("⚠️ MULTI-DEVICE ALERT: Your account was just logged in on another device. You have been disconnected here.");
+    isCheckingRef.current = true;
+    try {
+        const remoteId = await fetchRemoteSessionId(email);
+        // If someone else logged in, the remoteId in the cloud will be different from our localId
+        if (remoteId && remoteId !== localId && remoteId !== 'NOT_FOUND') {
+          logout("⚠️ SECURITY ALERT: Your account was logged in on another device. This session has been terminated.");
+        }
+    } catch (e) {
+        console.warn("Session check failed, skipping heartbeat.");
+    } finally {
+        isCheckingRef.current = false;
     }
   }, [logout, ADMIN_EMAIL]);
 
+  // Handle versioning to clear old local storage bugs
   useEffect(() => {
     const currentStoredVersion = localStorage.getItem('osm_app_version');
     if (currentStoredVersion !== STORAGE_VERSION) {
@@ -66,8 +78,9 @@ const useAuth = () => {
     }
   }, []);
 
+  // Main session lifecycle
   useEffect(() => {
-    const checkSession = () => {
+    const initializeAuth = async () => {
       const currentUserStr = localStorage.getItem('currentUser');
       if (!currentUserStr) return;
 
@@ -76,23 +89,39 @@ const useAuth = () => {
         setUser(currentUser);
         setView('chat');
 
+        // Initial immediate check
+        await validateSessionCloud(currentUser.email, currentUser.sessionId);
+
         if (!checkIntervalRef.current) {
-          // Check every 15 seconds for device conflicts
+          // Check every 10 seconds for device conflicts
           checkIntervalRef.current = setInterval(() => {
             validateSessionCloud(currentUser.email, currentUser.sessionId);
-          }, 15000);
+          }, 10000);
         }
       } catch (e) {
-        console.error("Session restore failed", e);
+        console.error("Auth restore error", e);
       }
     };
 
-    checkSession();
-    return () => { if (checkIntervalRef.current) clearInterval(checkIntervalRef.current); };
-  }, [logout, validateSessionCloud]);
+    initializeAuth();
+
+    // Re-check when the user switches tabs back to the app
+    const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible' && user) {
+            validateSessionCloud(user.email, user.sessionId);
+        }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => { 
+        if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [logout, validateSessionCloud, user]);
 
   const finalizeLogin = useCallback(async (userData: any) => {
-    const newSessionId = "SID_" + Math.random().toString(36).substring(2, 9) + Date.now();
+    // Create a truly unique ID for this specific login instance
+    const newSessionId = "SID_" + Math.random().toString(36).substring(2, 10) + "_" + Date.now();
     const lowerEmail = userData.email.toLowerCase().trim();
     
     const userToAuth: User = { 
@@ -102,7 +131,7 @@ const useAuth = () => {
         sessionId: newSessionId 
     };
 
-    // Push new ID to cloud immediately
+    // Inform cloud that THIS session is now the only active one
     if (lowerEmail !== ADMIN_EMAIL.toLowerCase()) {
       await syncSessionToCloud(lowerEmail, newSessionId, userToAuth.name, userToAuth.mobile);
     }
@@ -121,26 +150,26 @@ const useAuth = () => {
         const hashedPassword = await hashPassword(password || '');
         const lowerEmail = email.toLowerCase().trim();
         
+        // Admin override
         if (lowerEmail === ADMIN_EMAIL.toLowerCase() && hashedPassword === ADMIN_HASH) {
             return { success: true, tempUser: { name: 'Admin', email: ADMIN_EMAIL } };
         }
 
-        // Check Cloud Database First
+        // Validate credentials against Cloud DB
         const cloudUser = await fetchUserFromCloud(lowerEmail);
         if (cloudUser && cloudUser.password === hashedPassword) {
             return { success: true, tempUser: cloudUser };
         } else {
-            return { success: false, error: 'Incorrect email or password.' };
+            return { success: false, error: 'Identity check failed. Invalid email or password.' };
         }
     } catch (e) {
-        return { success: false, error: "Cloud connection error. Try again." };
+        return { success: false, error: "Network fault. Please ensure your internet is active." };
     } finally {
         setIsAuthLoading(false);
     }
   }, [ADMIN_HASH, ADMIN_EMAIL]);
 
   const checkEmailExists = useCallback((email: string) => {
-    // Check locally for speed, cloud during actual auth
     const users = JSON.parse(localStorage.getItem('users') || '[]');
     return users.find((u: any) => u.email.toLowerCase() === email.toLowerCase()) || null;
   }, []);
@@ -150,7 +179,7 @@ const useAuth = () => {
     try {
         const cloudCheck = await fetchUserFromCloud(credentials.email);
         if (cloudCheck) {
-            setAuthError('Email already registered.');
+            setAuthError('Identity already exists in registry.');
             return false;
         }
         return true; 
@@ -168,16 +197,14 @@ const useAuth = () => {
             password: hashedPassword 
         };
         
-        // Sync to cloud
         await logInternRegistration({
             email: newUser.email,
             mobile: newUser.mobile || '',
             userName: newUser.userName || '',
             password: hashedPassword,
-            emailCode: 'NEW_ACCOUNT'
+            emailCode: 'REG'
         });
 
-        // Store locally as backup
         const localUsers = JSON.parse(localStorage.getItem('users') || '[]');
         localUsers.push(newUser);
         localStorage.setItem('users', JSON.stringify(localUsers));

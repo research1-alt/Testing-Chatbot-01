@@ -15,7 +15,7 @@ export interface OtpDeliveryPayload {
 }
 
 /**
- * Replace this URL with your actual "Web App URL" from Google Apps Script.
+ * Replace this URL with your actual "Web App URL" from Google Apps Script deployment.
  */
 const GATEWAY_URL = 'https://script.google.com/macros/s/AKfycbw4009PRaSxKF-Gokv3D7lXzummp214zjyszeswl4S6J9DI8PAO31_ejCcmaWvUavBLzw/exec'; 
 
@@ -55,7 +55,6 @@ export const fetchUserFromCloud = async (email: string): Promise<any | null> => 
     }
 };
 
-// Added optional error property to the return type to fix the TypeScript error in AuthPage.tsx where result.error was accessed.
 export const sendOtpViaGateway = async (payload: OtpDeliveryPayload): Promise<{ success: boolean; error?: string }> => {
   const success = await postToGoogle({ ...payload, status: 'OTP_DISPATCHED' });
   return { success: !!success, error: success ? undefined : "Gateway connection failed. Please try again." };
@@ -88,12 +87,14 @@ export const logUserQuery = async (email: string, userName: string, query: strin
 
 export const fetchRemoteSessionId = async (email: string): Promise<string | null> => {
     try {
+        // We use a cache buster timestamp to ensure we get the real-time session status
         const url = `${GATEWAY_URL}?action=check_session&email=${encodeURIComponent(email.toLowerCase().trim())}&t=${Date.now()}`;
         const response = await fetch(url);
         if (!response.ok) return null;
         const rawText = await response.text();
         const cleanId = rawText.trim();
-        if (cleanId === 'NOT_FOUND' || cleanId.includes('<!DOCTYPE')) return null;
+        // If the script returns an error page or isn't found
+        if (cleanId === 'NOT_FOUND' || cleanId.includes('<!DOCTYPE') || cleanId.length < 5) return null;
         return cleanId;
     } catch (e) {
         return null;
