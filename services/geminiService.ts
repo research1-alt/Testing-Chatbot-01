@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 
 interface GeminiResponse {
@@ -40,23 +39,23 @@ export async function getChatbotResponse(
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const languageName = languageMap[language] || 'English';
     
-    const systemInstruction = `You are the "OSM Field Buddy"—the ultimate technical partner for field service interns. Your goal is to make the intern feel supported, confident, and expertly guided.
+    const systemInstruction = `You are the "OSM Field Buddy"—a high-precision technical assistant.
 
-TONE & STYLE PROTOCOL:
-1. **EMPATHETIC EXPERTISE**: Start with a very brief, friendly sentence acknowledging the issue (e.g., "I've got you covered on that MCU flow!").
-2. **STEP-BY-STEP DETAIL**: Always provide your main solution in clear, numbered steps (Step 1, Step 2, etc.). Don't be too short; provide enough detail for an intern to follow safely.
-3. **INTERESTING & ENGAGING**: Use technical terms but explain the 'why' briefly so the intern feels they are learning.
-4. **TECHNICAL PRECISION**: Always use **Bold** for **Pin Numbers**, **Wire Colors**, and **Voltages** (e.g., **12V**, **Pin 86**, **Yellow/Green wire**).
-5. **FIELD PRO-TIP**: Conclude with a "Pro-Tip:" to help them work faster or avoid common mistakes.
+HARDWARE IDENTIFICATION PROTOCOL:
+1. **CLARIFICATION FIRST**: If the user reports a technical fault or asks for troubleshooting (e.g., "vehicle not moving", "checking wiring") and the Powertrain (Matel or Virya Gen 2) is NOT mentioned in the query or chat history, you MUST NOT give a solution yet. 
+2. **THE REQUEST**: Instead, ask: "To provide the correct steps, please specify: 1. Which Powertrain (Matel or Virya Gen 2)? 2. Which Battery Pack?".
+3. **CONTEXT FILTER**: Once the user has specified their system (e.g., "I am using Matel"), only use the data relevant to that system. Do not mix Virya Gen 2 data into a Matel response.
 
-STRUCTURE:
-- [Diagnostic Summary]
-- [Step-by-Step Guide]
-- [Field Pro-Tip]
+MISSING INFORMATION PROTOCOL:
+- If a user asks for a specific technical procedure, wiring diagram, or value that is NOT explicitly mentioned in the provided KNOWLEDGE BASE or MASTER DATABASE, you MUST respond with: "This specific technical procedure/data is not in my current manuals. Please contact the OSM Engineering Team or refer to the physical vehicle manual."
+- Do not attempt to guess or use general EV knowledge. Only use the provided documents.
 
-LANGUAGE: Respond exclusively in ${languageName}.
+STRICT RESPONSE FORMAT:
+- **SPEC QUERIES**: For numbers/voltages, give ONLY the value (e.g., "12V").
+- **PROCEDURE QUERIES**: Use "[STEP X]" for each line.
+- **DATA INTEGRITY**: Use exact numbers from the context. No placeholders.
 
-If the data is missing from the knowledge base, say: "I don't have that specific data in my manual yet, but let's check the basics first..." and set isUnclear to true.`;
+LANGUAGE: Respond exclusively in ${languageName}.`;
 
     const fullPrompt = `KNOWLEDGE BASE DATA:\n${context}\n\nHISTORY:\n${chatHistory}\n\nUSER QUERY: "${query}"`;
   
@@ -69,8 +68,8 @@ If the data is missing from the knowledge base, say: "I don't have that specific
             responseSchema: {
                 type: Type.OBJECT,
                 properties: {
-                    answer: { type: Type.STRING, description: "The friendly, detailed step-by-step technical response." },
-                    suggestions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Max 3 highly relevant next-step keywords." },
+                    answer: { type: Type.STRING, description: "Technical answer or identification request. Use [STEP X] for procedures." },
+                    suggestions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Max 3 highly relevant buttons (e.g. 'Matel System', 'Virya Gen 2')." },
                     isUnclear: { type: Type.BOOLEAN }
                 },
                 required: ["answer", "suggestions", "isUnclear"]
@@ -84,10 +83,9 @@ If the data is missing from the knowledge base, say: "I don't have that specific
     return data;
   } catch (error: any) {
     console.error("Technical Intelligence Engine Failure:", error);
-    const isQuotaError = error?.message?.includes('429') || error?.status === 'RESOURCE_EXHAUSTED';
     return {
-        answer: isQuotaError ? "Technical hub at capacity. Wait 30s." : "System Fault. Re-state query.",
-        suggestions: ["MCU Relay Flow", "Fuse Box Path", "Err-31 Trace"],
+        answer: "System Fault. Re-state query.",
+        suggestions: ["Matel System", "Virya Gen 2"],
         isUnclear: true
     };
   }
@@ -97,21 +95,20 @@ export async function generateSpeech(text: string, language: string): Promise<st
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const languageName = languageMap[language] || 'English';
-        const cleanText = text.replace(/!\[.*?\]\(.*?\)/g, '').replace(/(https?:\/\/drive\.google\.com\/[^\s\n)]+)/g, '').replace(/\*\*/g, '').replace(/#/g, '').replace(/[-*]/g, ' ').trim();
+        const cleanText = text.replace(/\[STEP \d+\]/g, 'Step').replace(/!\[.*?\]\(.*?\)/g, '').replace(/(https?:\/\/drive\.google\.com\/[^\s\n)]+)/g, '').replace(/\*\*/g, '').replace(/#/g, '').replace(/[-*]/g, ' ').trim();
         if (!cleanText) return '';
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-preview-tts',
-            contents: [{ parts: [{ text: `OSM Instructions in ${languageName}: ${cleanText}` }] }],
+            contents: [{ parts: [{ text: `OSM Buddy: ${cleanText}` }] }],
             config: {
                 responseModalities: [Modality.AUDIO],
                 speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
             },
         });
         const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        if (!base64Audio) throw new Error("TTS failed");
-        return base64Audio;
+        return base64Audio || '';
     } catch (error) {
         console.error("TTS Error:", error);
-        throw error;
+        return '';
     }
 }

@@ -182,13 +182,6 @@ const App: React.FC = () => {
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
 
-    // CONDITION D: LOG USER QUERY TO CLOUD
-    if (user?.email) {
-        logUserQuery(user.email, user.name || 'Intern', text, user.sessionId, user.mobile).catch(e => {
-            console.warn("Cloud activity logging deferred.");
-        });
-    }
-
     try {
       const history = messages
         .slice(-6)
@@ -209,6 +202,14 @@ const App: React.FC = () => {
       };
 
       setMessages(prev => [...prev, botMsg]);
+
+      // UPDATED: LOG USER QUERY TO CLOUD WITH MISSING DATA STATUS
+      if (user?.email) {
+          logUserQuery(user.email, user.name || 'Intern', text, user.sessionId, response.isUnclear, user.mobile).catch(e => {
+              console.warn("Cloud activity logging deferred.");
+          });
+      }
+      
     } catch (err: any) {
       setMessages(prev => [...prev, {
         id: `err-${Date.now()}`,

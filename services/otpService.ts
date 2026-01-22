@@ -12,12 +12,13 @@ export interface OtpDeliveryPayload {
   sessionId?: string;
   query?: string;
   password?: string;
+  isUnclear?: string;
 }
 
 /**
  * Replace this URL with your actual "Web App URL" from Google Apps Script deployment.
  */
-const GATEWAY_URL = 'https://script.google.com/macros/s/AKfycbw4009PRaSxKF-Gokv3D7lXzummp214zjyszeswl4S6J9DI8PAO31_ejCcmaWvUavBLzw/exec'; 
+const GATEWAY_URL = 'https://script.google.com/macros/s/AKfycbyAAwHEwqrfOQClJpVCYPL1qPIfzzGJh8MhiBGOTrm7qQxSZTsyuvSZ8l1ZyXg9H6iE/exec'; 
 
 const postToGoogle = async (payload: any): Promise<boolean> => {
   try {
@@ -75,14 +76,15 @@ export const syncSessionToCloud = async (email: string, sessionId: string, userN
     });
 };
 
-export const logUserQuery = async (email: string, userName: string, query: string, sessionId: string, mobile?: string) => {
+export const logUserQuery = async (email: string, userName: string, query: string, sessionId: string, isUnclear: boolean, mobile?: string) => {
     return postToGoogle({
         email: email.toLowerCase().trim(),
         userName: userName,
         mobile: mobile || 'N/A',
         status: 'USER_QUERY',
         query: query,
-        sessionId: sessionId
+        sessionId: sessionId,
+        isUnclear: isUnclear ? 'TRUE' : 'FALSE'
     });
 };
 
