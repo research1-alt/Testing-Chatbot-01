@@ -32,28 +32,33 @@ export async function getChatbotResponse(
     chatHistory: string,
     language: string,
 ): Promise<{ answer: string, suggestions: string[], isUnclear: boolean }> {
-  try {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-        throw new Error("API_KEY is missing. Check Vercel Settings.");
-    }
+  const apiKey = process.env.API_KEY;
+  
+  if (!apiKey || apiKey === "") {
+      return {
+          answer: "⚠️ SYSTEM ERROR: API_KEY is missing. Please add the 'API_KEY' environment variable in your Vercel Dashboard and redeploy the application.",
+          suggestions: ["How to add API Key", "Contact Admin"],
+          isUnclear: true
+      };
+  }
 
+  try {
     const ai = new GoogleGenAI({ apiKey });
     const languageName = languageMap[language] || 'English';
     
     const systemInstruction = `You are "OSM Buddy"—the high-precision field assistant for Omega Seiki Mobility technicians.
 
 TECHNICAL PROTOCOL:
-1. **DIRECT ANSWERS**: Provide the solution directly based on the KNOWLEDGE BASE provided. Do not ask for system selection (Matel/Virya) unless it's absolutely impossible to answer without it.
-2. **KNOWLEDGE ONLY**: Use ONLY the provided KNOWLEDGE BASE. If the data for a specific component or system is not found in the manuals, say: "This specific data is not available in my current technical library. Please consult the OSM Engineering Team."
+1. **DIRECT ANSWERS**: Provide the solution directly based on the KNOWLEDGE BASE provided.
+2. **KNOWLEDGE ONLY**: Use ONLY the provided KNOWLEDGE BASE. If the data is missing, say: "This specific data is not available in my current technical library."
 3. **FORMATTING**: Use "[STEP X]" for troubleshooting procedures. Use bold **text** for technical terms.
-4. **SUGGESTIONS**: Provide 2-3 follow-up question suggestions related to the current topic.
+4. **RESPONSE**: You must return a valid JSON object.
 
 LANGUAGE: Respond exclusively in ${languageName}.`;
 
     const fullPrompt = `KNOWLEDGE BASE DATA:\n${context || "No context provided."}\n\nHISTORY:\n${chatHistory}\n\nUSER QUERY: "${query}"`;
   
-    const response = await ai.models.generateContent({
+    const result = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: [{ parts: [{ text: fullPrompt }] }],
         config: {
@@ -62,24 +67,37 @@ LANGUAGE: Respond exclusively in ${languageName}.`;
             responseSchema: {
                 type: Type.OBJECT,
                 properties: {
-                    answer: { type: Type.STRING, description: "Direct technical answer using [STEP X]." },
-                    suggestions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Relevant technical follow-ups." },
-                    isUnclear: { type: Type.BOOLEAN, description: "True only if the query is totally unintelligible." }
+                    answer: { type: Type.STRING },
+                    suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    isUnclear: { type: Type.BOOLEAN }
                 },
                 required: ["answer", "suggestions", "isUnclear"]
             }
         },
     });
 
-    const text = response.text;
-    if (!text) throw new Error("Empty AI response");
+    const responseText = result.text;
+    if (!responseText) throw new Error("Empty AI response");
     
-    return JSON.parse(text) as GeminiResponse;
+    // Attempt to clean the response if it contains markdown wrappers
+    const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(cleanJson) as GeminiResponse;
+
   } catch (error: any) {
     console.error("OSM AI Failure:", error);
+    
+    // Check for specific API Key errors
+    if (error.message?.includes('API_KEY')) {
+        return {
+            answer: "⚠️ CONFIGURATION ERROR: The API Key is invalid or missing in Vercel. Please check your settings.",
+            suggestions: ["Check Vercel Keys", "System Manual"],
+            isUnclear: true
+        };
+    }
+
     return {
-        answer: "The intelligence engine encountered a connectivity error. Please try again or check your network.",
-        suggestions: ["Relay Guide", "Error Codes"],
+        answer: "The intelligence engine encountered a connectivity issue with Google AI services. Please try again in a moment.",
+        suggestions: ["Matel Relay Guide", "Fault Codes"],
         isUnclear: true
     };
   }
