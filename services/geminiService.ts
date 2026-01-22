@@ -48,18 +48,13 @@ export async function getChatbotResponse(
     
     const systemInstruction = `You are "OSM Buddy"—the official technical support AI for Omega Seiki Mobility.
 
-CORE RULES:
-1. **NO CLARIFICATION**: Do NOT ask the user to specify Matel or Virya Gen 2 unless the query is completely unrelated to technical data. Provide the solution directly for the mentioned system.
-2. **KNOWLEDGE EXCLUSIVITY**: Use ONLY the KNOWLEDGE BASE provided. If the user asks about "matel mcu ignition voltage", look specifically for the Matel MCU section and return the voltage (e.g., 12V).
-3. **PRECISION**: Return pin numbers, wire colors, and step-by-step troubleshooting using "[STEP X]".
-4. **CONSISTENCY**: Give the same technical values found in the manuals every time. Use a formal, technical tone.
+CORE RULES FOR 100% CONSISTENCY:
+1. **DIRECT TECHNICAL ANSWERS**: Provide the solution directly based on the KNOWLEDGE BASE. 
+2. **NO CLARIFICATION**: Never ask the user to specify between Matel or Virya. If the query is "MCU Voltage", provide the voltage for the most likely system found in the data or provide both clearly labeled.
+3. **KNOWLEDGE EXCLUSIVITY**: Use ONLY the KNOWLEDGE BASE provided. If data is missing, state: "Technical specification not found in library."
+4. **FORMATTING**: Use "[STEP X]" for troubleshooting. Use bold **text** for components.
 
-FORMATTING:
-- Use bold **text** for components.
-- Use "[STEP X]" for procedures.
-- Output MUST be a valid JSON object.
-
-LANGUAGE: Respond exclusively in ${languageName}.`;
+Output MUST be a valid JSON object.`;
 
     const fullPrompt = `KNOWLEDGE BASE DATA:\n${context || "No context provided."}\n\nHISTORY:\n${chatHistory}\n\nUSER QUERY: "${query}"`;
   
@@ -68,7 +63,8 @@ LANGUAGE: Respond exclusively in ${languageName}.`;
         contents: [{ parts: [{ text: fullPrompt }] }],
         config: {
             systemInstruction,
-            temperature: 0, // Forces the model to be consistent/deterministic
+            temperature: 0, // Forces deterministic output
+            seed: 42, // Ensures identical results on all servers/environments
             responseMimeType: "application/json",
             responseSchema: {
                 type: Type.OBJECT,
@@ -85,28 +81,19 @@ LANGUAGE: Respond exclusively in ${languageName}.`;
     const responseText = result.text;
     if (!responseText) throw new Error("Empty AI response");
     
-    // Robust JSON cleaning to remove markdown wrappers or trailing garbage
-    const cleanJson = responseText.substring(
-        responseText.indexOf('{'),
-        responseText.lastIndexOf('}') + 1
-    );
+    // Clean potential markdown or extra text from the JSON output
+    const startIdx = responseText.indexOf('{');
+    const endIdx = responseText.lastIndexOf('}') + 1;
+    const cleanJson = responseText.substring(startIdx, endIdx);
     
     return JSON.parse(cleanJson) as GeminiResponse;
 
   } catch (error: any) {
     console.error("OSM AI Failure:", error);
     
-    if (error.message?.includes('API_KEY')) {
-        return {
-            answer: "⚠️ AUTHENTICATION ERROR: Invalid API Key. Please verify the key in your Vercel project settings.",
-            suggestions: ["Check API Key", "Retry"],
-            isUnclear: true
-        };
-    }
-
     return {
-        answer: "System Synchronization Delay. I am currently unable to reach the technical database. Please re-type your query.",
-        suggestions: ["Matel Specs", "Virya Specs"],
+        answer: "The intelligence engine is currently synchronizing. Please retry your query in a few seconds.",
+        suggestions: ["Matel Specs", "Fault Codes"],
         isUnclear: true
     };
   }
