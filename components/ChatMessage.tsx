@@ -67,7 +67,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
     const imageParts: React.ReactNode[] = [];
     let processedText = text;
     
-    // Extract Markdown Images
     const mdMatches = text.match(mdRegex);
     if (mdMatches) {
         mdMatches.forEach((match, idx) => {
@@ -79,7 +78,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
         });
     }
 
-    // Extract raw Google Drive links to turn them into viewable cards
     const driveMatches = processedText.match(driveRegex);
     if (driveMatches) {
         driveMatches.forEach((match, idx) => {
@@ -163,7 +161,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
   };
 
   const formatMessage = (text: string) => {
-    // Detect very short spec answers (e.g., "12V", "Pin 30")
     if (text.length < 15 && /\d+/.test(text) && !isUser) {
         return (
             <div className="flex flex-col items-center justify-center p-4 bg-sky-900 rounded-2xl border-4 border-sky-100 shadow-xl">
@@ -172,27 +169,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
             </div>
         );
     }
-
-    // Detect hardware identification requests
-    const isHardwareCheck = (text.toLowerCase().includes('please specify') || text.toLowerCase().includes('which system')) && !isUser;
-    
-    if (isHardwareCheck) {
-        return (
-            <div className="flex flex-col p-5 bg-amber-50 rounded-[2rem] border-2 border-amber-200 shadow-md">
-                <div className="flex items-center gap-2 mb-4">
-                    <span className="text-xl">🛠️</span>
-                    <span className="text-[11px] font-black text-amber-700 uppercase tracking-widest">System Selection Required</span>
-                </div>
-                <div className="mb-4">
-                    {processContent(text)}
-                </div>
-                <div className="pt-3 border-t border-amber-200">
-                    <p className="text-[9px] text-amber-600 font-black uppercase tracking-[0.2em]">SELECT AN OPTION BELOW TO CONTINUE</p>
-                </div>
-            </div>
-        );
-    }
-
+    // Removed hardware selection wrap to allow direct answers
     return processContent(text);
   };
 

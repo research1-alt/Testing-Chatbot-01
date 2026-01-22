@@ -44,14 +44,14 @@ export async function getChatbotResponse(
     const systemInstruction = `You are "OSM Buddy"—the high-precision field assistant for Omega Seiki Mobility technicians.
 
 TECHNICAL PROTOCOL:
-1. **CLARIFICATION**: If the user's query relates to troubleshooting or specs but lacks specific hardware details (Matel vs Virya, or Battery Type), you MUST ask for them.
-2. **SUGGESTIONS**: Your "suggestions" array must match the choices you just offered in the text (e.g., if you ask for Battery Pack, offer "48V 10kWh" and "48V 5kWh" as buttons).
-3. **KNOWLEDGE ONLY**: Use ONLY the provided KNOWLEDGE BASE. If data is missing, say: "This specific data is not in my manuals. Contact Engineering."
-4. **FORMATTING**: Use "[STEP X]" for all procedural lines. Use bold **text** for component names. Include Drive links as plain text URLs.
+1. **DIRECT ANSWERS**: Provide the solution directly based on the KNOWLEDGE BASE provided. Do not ask for system selection (Matel/Virya) unless it's absolutely impossible to answer without it.
+2. **KNOWLEDGE ONLY**: Use ONLY the provided KNOWLEDGE BASE. If the data for a specific component or system is not found in the manuals, say: "This specific data is not available in my current technical library. Please consult the OSM Engineering Team."
+3. **FORMATTING**: Use "[STEP X]" for troubleshooting procedures. Use bold **text** for technical terms.
+4. **SUGGESTIONS**: Provide 2-3 follow-up question suggestions related to the current topic.
 
 LANGUAGE: Respond exclusively in ${languageName}.`;
 
-    const fullPrompt = `KNOWLEDGE BASE:\n${context || "No context."}\n\nHISTORY:\n${chatHistory}\n\nUSER QUERY: "${query}"`;
+    const fullPrompt = `KNOWLEDGE BASE DATA:\n${context || "No context provided."}\n\nHISTORY:\n${chatHistory}\n\nUSER QUERY: "${query}"`;
   
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
@@ -62,9 +62,9 @@ LANGUAGE: Respond exclusively in ${languageName}.`;
             responseSchema: {
                 type: Type.OBJECT,
                 properties: {
-                    answer: { type: Type.STRING, description: "Detailed technical response with [STEP X]." },
-                    suggestions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "3 context-specific buttons." },
-                    isUnclear: { type: Type.BOOLEAN, description: "True if you are asking for clarification." }
+                    answer: { type: Type.STRING, description: "Direct technical answer using [STEP X]." },
+                    suggestions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Relevant technical follow-ups." },
+                    isUnclear: { type: Type.BOOLEAN, description: "True only if the query is totally unintelligible." }
                 },
                 required: ["answer", "suggestions", "isUnclear"]
             }
@@ -74,19 +74,12 @@ LANGUAGE: Respond exclusively in ${languageName}.`;
     const text = response.text;
     if (!text) throw new Error("Empty AI response");
     
-    const data = JSON.parse(text) as GeminiResponse;
-    
-    // Safety check: ensure suggestions aren't empty if bot is asking a question
-    if (data.isUnclear && data.suggestions.length === 0) {
-        data.suggestions = ["Matel System", "Virya Gen 2"];
-    }
-    
-    return data;
+    return JSON.parse(text) as GeminiResponse;
   } catch (error: any) {
     console.error("OSM AI Failure:", error);
     return {
-        answer: "Communication Fault (RPC-500). If this persists, please ensure the API_KEY is set in Vercel and redeploy the app.",
-        suggestions: ["Retry Query", "System Status"],
+        answer: "The intelligence engine encountered a connectivity error. Please try again or check your network.",
+        suggestions: ["Relay Guide", "Error Codes"],
         isUnclear: true
     };
   }
