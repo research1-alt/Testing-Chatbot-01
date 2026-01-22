@@ -36,8 +36,8 @@ export async function getChatbotResponse(
   
   if (!apiKey || apiKey === "") {
       return {
-          answer: "⚠️ SYSTEM ERROR: API_KEY is missing. Please add the 'API_KEY' environment variable in your Vercel Dashboard and redeploy the application.",
-          suggestions: ["How to add API Key", "Contact Admin"],
+          answer: "⚠️ SYSTEM CONFIGURATION ERROR: The 'API_KEY' is missing in Vercel environment variables. Please add it and redeploy.",
+          suggestions: ["Setup Guide", "Contact Admin"],
           isUnclear: true
       };
   }
@@ -46,13 +46,18 @@ export async function getChatbotResponse(
     const ai = new GoogleGenAI({ apiKey });
     const languageName = languageMap[language] || 'English';
     
-    const systemInstruction = `You are "OSM Buddy"—the high-precision field assistant for Omega Seiki Mobility technicians.
+    const systemInstruction = `You are "OSM Buddy"—the official technical support AI for Omega Seiki Mobility.
 
-TECHNICAL PROTOCOL:
-1. **DIRECT ANSWERS**: Provide the solution directly based on the KNOWLEDGE BASE provided.
-2. **KNOWLEDGE ONLY**: Use ONLY the provided KNOWLEDGE BASE. If the data is missing, say: "This specific data is not available in my current technical library."
-3. **FORMATTING**: Use "[STEP X]" for troubleshooting procedures. Use bold **text** for technical terms.
-4. **RESPONSE**: You must return a valid JSON object.
+CORE RULES:
+1. **NO CLARIFICATION**: Do NOT ask the user to specify Matel or Virya Gen 2 unless the query is completely unrelated to technical data. Provide the solution directly for the mentioned system.
+2. **KNOWLEDGE EXCLUSIVITY**: Use ONLY the KNOWLEDGE BASE provided. If the user asks about "matel mcu ignition voltage", look specifically for the Matel MCU section and return the voltage (e.g., 12V).
+3. **PRECISION**: Return pin numbers, wire colors, and step-by-step troubleshooting using "[STEP X]".
+4. **CONSISTENCY**: Give the same technical values found in the manuals every time. Use a formal, technical tone.
+
+FORMATTING:
+- Use bold **text** for components.
+- Use "[STEP X]" for procedures.
+- Output MUST be a valid JSON object.
 
 LANGUAGE: Respond exclusively in ${languageName}.`;
 
@@ -63,6 +68,7 @@ LANGUAGE: Respond exclusively in ${languageName}.`;
         contents: [{ parts: [{ text: fullPrompt }] }],
         config: {
             systemInstruction,
+            temperature: 0, // Forces the model to be consistent/deterministic
             responseMimeType: "application/json",
             responseSchema: {
                 type: Type.OBJECT,
@@ -79,25 +85,28 @@ LANGUAGE: Respond exclusively in ${languageName}.`;
     const responseText = result.text;
     if (!responseText) throw new Error("Empty AI response");
     
-    // Attempt to clean the response if it contains markdown wrappers
-    const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+    // Robust JSON cleaning to remove markdown wrappers or trailing garbage
+    const cleanJson = responseText.substring(
+        responseText.indexOf('{'),
+        responseText.lastIndexOf('}') + 1
+    );
+    
     return JSON.parse(cleanJson) as GeminiResponse;
 
   } catch (error: any) {
     console.error("OSM AI Failure:", error);
     
-    // Check for specific API Key errors
     if (error.message?.includes('API_KEY')) {
         return {
-            answer: "⚠️ CONFIGURATION ERROR: The API Key is invalid or missing in Vercel. Please check your settings.",
-            suggestions: ["Check Vercel Keys", "System Manual"],
+            answer: "⚠️ AUTHENTICATION ERROR: Invalid API Key. Please verify the key in your Vercel project settings.",
+            suggestions: ["Check API Key", "Retry"],
             isUnclear: true
         };
     }
 
     return {
-        answer: "The intelligence engine encountered a connectivity issue with Google AI services. Please try again in a moment.",
-        suggestions: ["Matel Relay Guide", "Fault Codes"],
+        answer: "System Synchronization Delay. I am currently unable to reach the technical database. Please re-type your query.",
+        suggestions: ["Matel Specs", "Virya Specs"],
         isUnclear: true
     };
   }

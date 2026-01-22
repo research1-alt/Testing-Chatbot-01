@@ -161,15 +161,15 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
   };
 
   const formatMessage = (text: string) => {
-    if (text.length < 15 && /\d+/.test(text) && !isUser) {
+    // Detect very short technical answers (specifications)
+    if (text.length < 25 && /\d+/.test(text) && !isUser) {
         return (
-            <div className="flex flex-col items-center justify-center p-4 bg-sky-900 rounded-2xl border-4 border-sky-100 shadow-xl">
-                <span className="text-[10px] font-black text-sky-400 uppercase tracking-[0.3em] mb-1">Specification</span>
-                <span className="text-3xl font-black text-white tracking-tighter">{text}</span>
+            <div className="flex flex-col items-center justify-center p-6 bg-slate-900 rounded-[2rem] border-4 border-slate-100 shadow-2xl">
+                <span className="text-[10px] font-black text-sky-400 uppercase tracking-[0.4em] mb-2">Technical Specification</span>
+                <span className="text-4xl font-black text-white tracking-tighter">{text}</span>
             </div>
         );
     }
-    // Removed hardware selection wrap to allow direct answers
     return processContent(text);
   };
 
