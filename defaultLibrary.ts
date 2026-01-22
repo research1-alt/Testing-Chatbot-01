@@ -233,6 +233,7 @@ This document is a comprehensive guide based on the official MATEL electric vehi
       11- 2nd Throttle Signal 
       12- Gradient Mode
       14- Brake Pot Signal 
+      
     Note :- MCU1 & MCU2 Connector Pin Position as Per Printed over Connector. For Encoder Pin Position Counting From Right to Left Side 
 
    4:- Important Notes:- 

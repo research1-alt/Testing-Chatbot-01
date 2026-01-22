@@ -48,13 +48,14 @@ export async function getChatbotResponse(
     
     const systemInstruction = `You are "OSM Buddy"—the official technical support AI for Omega Seiki Mobility.
 
-CORE RULES FOR 100% CONSISTENCY:
-1. **DIRECT TECHNICAL ANSWERS**: Provide the solution directly based on the KNOWLEDGE BASE. 
-2. **NO CLARIFICATION**: Never ask the user to specify between Matel or Virya. If the query is "MCU Voltage", provide the voltage for the most likely system found in the data or provide both clearly labeled.
-3. **KNOWLEDGE EXCLUSIVITY**: Use ONLY the KNOWLEDGE BASE provided. If data is missing, state: "Technical specification not found in library."
-4. **FORMATTING**: Use "[STEP X]" for troubleshooting. Use bold **text** for components.
+CRITICAL ACCURACY RULES:
+1. **NO HALLUCINATION**: Only use pin numbers and voltages explicitly mentioned in the KNOWLEDGE BASE. 
+2. **MATEL SPECIFICS**: For Matel MCU, the ignition (KSI) is 12V. Pins are 1 & 10. Do NOT mention "Pin 23" or "11-60V" for Matel ignition unless it is explicitly in the provided text.
+3. **VIRYA SPECIFICS**: Do not mix Virya Gen 2 pinouts with Matel. They are separate systems.
+4. **HEADER MATCHING**: Before answering, verify if the user is asking about "Matel" or "Virya". Look for that specific header in the manuals.
+5. **CONSISTENCY**: Use "[STEP X]" for troubleshooting and bold **text** for components.
 
-Output MUST be a valid JSON object.`;
+FORMAT: Output MUST be a valid JSON object. If a value is not in the knowledge base, say "Data not available in current library."`;
 
     const fullPrompt = `KNOWLEDGE BASE DATA:\n${context || "No context provided."}\n\nHISTORY:\n${chatHistory}\n\nUSER QUERY: "${query}"`;
   
@@ -63,8 +64,8 @@ Output MUST be a valid JSON object.`;
         contents: [{ parts: [{ text: fullPrompt }] }],
         config: {
             systemInstruction,
-            temperature: 0, // Forces deterministic output
-            seed: 42, // Ensures identical results on all servers/environments
+            temperature: 0,
+            seed: 42,
             responseMimeType: "application/json",
             responseSchema: {
                 type: Type.OBJECT,
@@ -81,7 +82,6 @@ Output MUST be a valid JSON object.`;
     const responseText = result.text;
     if (!responseText) throw new Error("Empty AI response");
     
-    // Clean potential markdown or extra text from the JSON output
     const startIdx = responseText.indexOf('{');
     const endIdx = responseText.lastIndexOf('}') + 1;
     const cleanJson = responseText.substring(startIdx, endIdx);
@@ -90,9 +90,8 @@ Output MUST be a valid JSON object.`;
 
   } catch (error: any) {
     console.error("OSM AI Failure:", error);
-    
     return {
-        answer: "The intelligence engine is currently synchronizing. Please retry your query in a few seconds.",
+        answer: "Intelligence sync error. Please check your query or connectivity.",
         suggestions: ["Matel Specs", "Fault Codes"],
         isUnclear: true
     };
