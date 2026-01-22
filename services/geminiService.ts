@@ -33,25 +33,25 @@ export async function getChatbotResponse(
     language: string,
 ): Promise<{ answer: string, suggestions: string[], isUnclear: boolean }> {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+        throw new Error("API_KEY is missing. Check Vercel Settings.");
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
     const languageName = languageMap[language] || 'English';
     
-    const systemInstruction = `You are the "OSM Field Buddy"—a high-precision technical assistant.
+    const systemInstruction = `You are "OSM Buddy"—the high-precision field assistant for Omega Seiki Mobility technicians.
 
-HARDWARE IDENTIFICATION PROTOCOL:
-1. **CLARIFICATION FIRST**: If the user reports a technical fault and the Powertrain (Matel or Virya Gen 2) is NOT mentioned, you MUST ask: "To provide the correct steps, please specify: 1. Which Powertrain (Matel or Virya Gen 2)? 2. Which Battery Pack?".
-2. **CONTEXT FILTER**: Once specified, only use the data relevant to that system.
-
-MISSING INFORMATION PROTOCOL:
-- If technical data is NOT explicitly mentioned in the provided KNOWLEDGE BASE, say: "This specific technical procedure/data is not in my current manuals. Please contact the OSM Engineering Team."
-- Do not guess.
-
-STRICT RESPONSE FORMAT:
-- Use "[STEP X]" for each line in troubleshooting procedures.
+TECHNICAL PROTOCOL:
+1. **CLARIFICATION**: If the user's query relates to troubleshooting or specs but lacks specific hardware details (Matel vs Virya, or Battery Type), you MUST ask for them.
+2. **SUGGESTIONS**: Your "suggestions" array must match the choices you just offered in the text (e.g., if you ask for Battery Pack, offer "48V 10kWh" and "48V 5kWh" as buttons).
+3. **KNOWLEDGE ONLY**: Use ONLY the provided KNOWLEDGE BASE. If data is missing, say: "This specific data is not in my manuals. Contact Engineering."
+4. **FORMATTING**: Use "[STEP X]" for all procedural lines. Use bold **text** for component names. Include Drive links as plain text URLs.
 
 LANGUAGE: Respond exclusively in ${languageName}.`;
 
-    const fullPrompt = `KNOWLEDGE BASE DATA:\n${context || "No data provided."}\n\nHISTORY:\n${chatHistory}\n\nUSER QUERY: "${query}"`;
+    const fullPrompt = `KNOWLEDGE BASE:\n${context || "No context."}\n\nHISTORY:\n${chatHistory}\n\nUSER QUERY: "${query}"`;
   
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
@@ -62,27 +62,31 @@ LANGUAGE: Respond exclusively in ${languageName}.`;
             responseSchema: {
                 type: Type.OBJECT,
                 properties: {
-                    answer: { type: Type.STRING, description: "Technical answer. Use [STEP X] for steps." },
-                    suggestions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Max 3 buttons." },
-                    isUnclear: { type: Type.BOOLEAN }
+                    answer: { type: Type.STRING, description: "Detailed technical response with [STEP X]." },
+                    suggestions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "3 context-specific buttons." },
+                    isUnclear: { type: Type.BOOLEAN, description: "True if you are asking for clarification." }
                 },
                 required: ["answer", "suggestions", "isUnclear"]
             }
-            // Removed thinkingConfig to avoid RPC 500 errors in proxy environments
         },
     });
 
     const text = response.text;
-    if (!text) throw new Error("Intelligence Engine returned an empty response.");
+    if (!text) throw new Error("Empty AI response");
     
-    // With application/json, the output is directly a JSON string.
     const data = JSON.parse(text) as GeminiResponse;
+    
+    // Safety check: ensure suggestions aren't empty if bot is asking a question
+    if (data.isUnclear && data.suggestions.length === 0) {
+        data.suggestions = ["Matel System", "Virya Gen 2"];
+    }
+    
     return data;
   } catch (error: any) {
-    console.error("Technical Intelligence Engine Failure:", error);
+    console.error("OSM AI Failure:", error);
     return {
-        answer: "The intelligence engine encountered a communication fault (RPC 500). Please check your network or ensure your API Key is correctly set in the Vercel dashboard.",
-        suggestions: ["Matel System", "Virya Gen 2"],
+        answer: "Communication Fault (RPC-500). If this persists, please ensure the API_KEY is set in Vercel and redeploy the app.",
+        suggestions: ["Retry Query", "System Status"],
         isUnclear: true
     };
   }
@@ -90,21 +94,21 @@ LANGUAGE: Respond exclusively in ${languageName}.`;
 
 export async function generateSpeech(text: string, language: string): Promise<string> {
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const cleanText = text.replace(/\[STEP \d+\]/g, 'Step').replace(/!\[.*?\]\(.*?\)/g, '').replace(/(https?:\/\/drive\.google\.com\/[^\s\n)]+)/g, '').replace(/\*\*/g, '').replace(/#/g, '').replace(/[-*]/g, ' ').trim();
+        const apiKey = process.env.API_KEY;
+        if (!apiKey) return '';
+        const ai = new GoogleGenAI({ apiKey });
+        const cleanText = text.replace(/\[STEP \d+\]/g, 'Step').replace(/!\[.*?\]\(.*?\)/g, '').replace(/(https?:\/\/drive\.google\.com\/[^\s\n)]+)/g, '').replace(/\*\*/g, '').replace(/#/g, '').trim();
         if (!cleanText) return '';
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-preview-tts',
-            contents: [{ parts: [{ text: `OSM Buddy: ${cleanText}` }] }],
+            contents: [{ parts: [{ text: `OSM: ${cleanText}` }] }],
             config: {
                 responseModalities: [Modality.AUDIO],
                 speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
             },
         });
-        const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        return base64Audio || '';
+        return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || '';
     } catch (error) {
-        console.error("TTS Error:", error);
         return '';
     }
 }

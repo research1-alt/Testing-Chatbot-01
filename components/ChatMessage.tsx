@@ -61,38 +61,13 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
 
-  const formatText = (text: string) => {
-    // Detect very short spec answers (e.g., "12V", "Pin 30", "0.8V to 4V")
-    const isShortSpec = text.length < 15 && /\d+/.test(text);
-    if (isShortSpec && !isUser) {
-        return (
-            <div className="flex flex-col items-center justify-center p-4 bg-sky-900 rounded-2xl border-4 border-sky-100 shadow-xl">
-                <span className="text-[10px] font-black text-sky-400 uppercase tracking-[0.3em] mb-1">Specification</span>
-                <span className="text-3xl font-black text-white tracking-tighter">{text}</span>
-            </div>
-        );
-    }
-
-    // Detect hardware identification requests (Asking for Matel/Virya)
-    const isHardwareCheck = text.toLowerCase().includes('please specify') && text.toLowerCase().includes('powertrain');
-    if (isHardwareCheck && !isUser) {
-        return (
-            <div className="flex flex-col p-4 bg-amber-50 rounded-2xl border border-amber-200 shadow-md">
-                <div className="flex items-center gap-2 mb-3">
-                    <span className="text-xl">🛠️</span>
-                    <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">System Selection Required</span>
-                </div>
-                <p className="text-slate-800 font-bold mb-2 leading-tight">{text}</p>
-                <p className="text-[9px] text-amber-600 font-black uppercase tracking-widest">SELECT AN OPTION BELOW TO CONTINUE</p>
-            </div>
-        );
-    }
-
+  const processContent = (text: string) => {
     const mdRegex = /(!\[.*?\]\(.*?\))/g;
-    const driveRegex = /(https?:\/\/drive\.google\.com\/[^\s\n)]+)/g;
+    const driveRegex = /(https?:\/\/drive\.google\.com\/file\/d\/[a-zA-Z0-9_-]+[^\s\n)]*)/g;
     const imageParts: React.ReactNode[] = [];
     let processedText = text;
     
+    // Extract Markdown Images
     const mdMatches = text.match(mdRegex);
     if (mdMatches) {
         mdMatches.forEach((match, idx) => {
@@ -104,6 +79,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
         });
     }
 
+    // Extract raw Google Drive links to turn them into viewable cards
     const driveMatches = processedText.match(driveRegex);
     if (driveMatches) {
         driveMatches.forEach((match, idx) => {
@@ -131,9 +107,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
         }
 
         if (/^\s*[•\-*]/.test(part) && part.length < 5) {
-            return (
-                <span key={index} className="inline-flex items-center justify-center w-4 h-4 mr-2 text-sky-400 font-bold">•</span>
-            );
+            return <span key={index} className="inline-flex items-center justify-center w-4 h-4 mr-2 text-sky-400 font-bold">•</span>;
         }
 
         if (part === "Pro-Tip:") {
@@ -151,30 +125,24 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
         }
 
         if (/\b\d+(?:\.\d+)?[V|v|A|a]\b|\bPin \d+[a-z]?\b|\b\d+ Ohm\b|\bErr-\d+\b/.test(part)) {
-            return (
-                <span key={index} className="inline-block px-2 py-0.5 bg-sky-100 text-sky-900 font-black rounded-lg border border-sky-200 mx-0.5 text-[11px] shadow-sm">
-                    {part}
-                </span>
-            );
+            return <span key={index} className="inline-block px-2 py-0.5 bg-sky-100 text-sky-900 font-black rounded-lg border border-sky-200 mx-0.5 text-[11px] shadow-sm">{part}</span>;
         }
 
-        return <span key={index} className="text-slate-700 leading-relaxed">{part}</span>;
+        return <span key={index} className="text-slate-700 leading-relaxed whitespace-pre-wrap">{part}</span>;
     });
 
     return (
-      <div className="technical-container">
-        {imageParts}
-        <div className="message-content-text">
-          {contentNodes}
+        <div className="flex flex-col">
+            {imageParts}
+            <div className="message-content-text">{contentNodes}</div>
         </div>
-      </div>
     );
   };
 
   const renderImage = (alt: string, url: string, key: string) => {
     const directUrl = getDirectImageUrl(url);
     return (
-        <div key={key} className="mb-6 overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
+        <div key={key} className="mb-6 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-2xl">
             <div className="px-5 py-3 bg-slate-950 text-[10px] font-black text-white uppercase tracking-widest flex justify-between items-center">
                 <span className="flex items-center gap-2">
                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
@@ -192,6 +160,40 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
             </div>
         </div>
     );
+  };
+
+  const formatMessage = (text: string) => {
+    // Detect very short spec answers (e.g., "12V", "Pin 30")
+    if (text.length < 15 && /\d+/.test(text) && !isUser) {
+        return (
+            <div className="flex flex-col items-center justify-center p-4 bg-sky-900 rounded-2xl border-4 border-sky-100 shadow-xl">
+                <span className="text-[10px] font-black text-sky-400 uppercase tracking-[0.3em] mb-1">Specification</span>
+                <span className="text-3xl font-black text-white tracking-tighter">{text}</span>
+            </div>
+        );
+    }
+
+    // Detect hardware identification requests
+    const isHardwareCheck = (text.toLowerCase().includes('please specify') || text.toLowerCase().includes('which system')) && !isUser;
+    
+    if (isHardwareCheck) {
+        return (
+            <div className="flex flex-col p-5 bg-amber-50 rounded-[2rem] border-2 border-amber-200 shadow-md">
+                <div className="flex items-center gap-2 mb-4">
+                    <span className="text-xl">🛠️</span>
+                    <span className="text-[11px] font-black text-amber-700 uppercase tracking-widest">System Selection Required</span>
+                </div>
+                <div className="mb-4">
+                    {processContent(text)}
+                </div>
+                <div className="pt-3 border-t border-amber-200">
+                    <p className="text-[9px] text-amber-600 font-black uppercase tracking-[0.2em]">SELECT AN OPTION BELOW TO CONTINUE</p>
+                </div>
+            </div>
+        );
+    }
+
+    return processContent(text);
   };
 
   const handlePlayAudio = async () => {
@@ -228,9 +230,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
         <div className={`flex items-start gap-3 w-full ${isUser ? 'justify-end' : 'justify-start'}`}>
             {!isUser && <div className="w-8 h-8 rounded-full bg-sky-900 flex items-center justify-center font-black text-[10px] text-white flex-shrink-0 shadow-lg border-2 border-white uppercase tracking-tighter">OSM</div>}
             
-            <div className={`rounded-[1.5rem] p-5 max-w-[85%] sm:max-w-xl group relative shadow-xl transition-all border w-fit ${isUser ? 'bg-green-600 text-white border-green-500 rounded-br-none' : 'bg-white text-slate-800 border-slate-100 rounded-bl-none'}`}>
-                <div className="whitespace-pre-wrap text-[14px] leading-[1.6]">
-                  {formatText(message.text)}
+            <div className={`rounded-[1.5rem] p-5 max-w-[90%] sm:max-w-xl group relative shadow-xl transition-all border w-fit ${isUser ? 'bg-green-600 text-white border-green-500 rounded-br-none' : 'bg-white text-slate-800 border-slate-100 rounded-bl-none'}`}>
+                <div className="text-[14px] leading-[1.6]">
+                  {formatMessage(message.text)}
                 </div>
                 <div className={`text-[9px] mt-4 font-black flex justify-between items-center opacity-60 ${isUser ? 'text-green-50' : 'text-slate-400'}`}>
                     <span className="uppercase tracking-widest">{message.timestamp}</span>
@@ -253,7 +255,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
         </div>
         {!isUser && message.suggestions && (
             <div className="flex flex-wrap gap-2 ml-11 mt-2">
-                {message.suggestions.map((s, i) => <button key={i} onClick={() => onSendMessage(s)} className="text-[9px] font-black bg-white border border-slate-200 text-slate-500 py-1.5 px-4 rounded-full hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all uppercase tracking-[0.1em] shadow-sm">{s}</button>)}
+                {message.suggestions.map((s, i) => <button key={i} onClick={() => onSendMessage(s)} className="text-[10px] font-black bg-white border border-slate-200 text-slate-500 py-2 px-5 rounded-full hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all uppercase tracking-[0.1em] shadow-sm">{s}</button>)}
             </div>
         )}
 
