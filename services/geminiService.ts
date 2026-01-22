@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 
 interface GeminiResponse {
@@ -22,10 +23,6 @@ const languageMap: { [key: string]: string } = {
     'or-IN': 'Odia',
 };
 
-function cleanJsonResponse(text: string): string {
-    return text.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
-}
-
 /**
  * Technical Chatbot Intelligence - Specialized for OSM Field Service
  */
@@ -42,22 +39,19 @@ export async function getChatbotResponse(
     const systemInstruction = `You are the "OSM Field Buddy"—a high-precision technical assistant.
 
 HARDWARE IDENTIFICATION PROTOCOL:
-1. **CLARIFICATION FIRST**: If the user reports a technical fault or asks for troubleshooting (e.g., "vehicle not moving", "checking wiring") and the Powertrain (Matel or Virya Gen 2) is NOT mentioned in the query or chat history, you MUST NOT give a solution yet. 
-2. **THE REQUEST**: Instead, ask: "To provide the correct steps, please specify: 1. Which Powertrain (Matel or Virya Gen 2)? 2. Which Battery Pack?".
-3. **CONTEXT FILTER**: Once the user has specified their system (e.g., "I am using Matel"), only use the data relevant to that system. Do not mix Virya Gen 2 data into a Matel response.
+1. **CLARIFICATION FIRST**: If the user reports a technical fault and the Powertrain (Matel or Virya Gen 2) is NOT mentioned, you MUST ask: "To provide the correct steps, please specify: 1. Which Powertrain (Matel or Virya Gen 2)? 2. Which Battery Pack?".
+2. **CONTEXT FILTER**: Once specified, only use the data relevant to that system.
 
 MISSING INFORMATION PROTOCOL:
-- If a user asks for a specific technical procedure, wiring diagram, or value that is NOT explicitly mentioned in the provided KNOWLEDGE BASE or MASTER DATABASE, you MUST respond with: "This specific technical procedure/data is not in my current manuals. Please contact the OSM Engineering Team or refer to the physical vehicle manual."
-- Do not attempt to guess or use general EV knowledge. Only use the provided documents.
+- If technical data is NOT explicitly mentioned in the provided KNOWLEDGE BASE, say: "This specific technical procedure/data is not in my current manuals. Please contact the OSM Engineering Team."
+- Do not guess.
 
 STRICT RESPONSE FORMAT:
-- **SPEC QUERIES**: For numbers/voltages, give ONLY the value (e.g., "12V").
-- **PROCEDURE QUERIES**: Use "[STEP X]" for each line.
-- **DATA INTEGRITY**: Use exact numbers from the context. No placeholders.
+- Use "[STEP X]" for each line in troubleshooting procedures.
 
 LANGUAGE: Respond exclusively in ${languageName}.`;
 
-    const fullPrompt = `KNOWLEDGE BASE DATA:\n${context}\n\nHISTORY:\n${chatHistory}\n\nUSER QUERY: "${query}"`;
+    const fullPrompt = `KNOWLEDGE BASE DATA:\n${context || "No data provided."}\n\nHISTORY:\n${chatHistory}\n\nUSER QUERY: "${query}"`;
   
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
@@ -68,23 +62,26 @@ LANGUAGE: Respond exclusively in ${languageName}.`;
             responseSchema: {
                 type: Type.OBJECT,
                 properties: {
-                    answer: { type: Type.STRING, description: "Technical answer or identification request. Use [STEP X] for procedures." },
-                    suggestions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Max 3 highly relevant buttons (e.g. 'Matel System', 'Virya Gen 2')." },
+                    answer: { type: Type.STRING, description: "Technical answer. Use [STEP X] for steps." },
+                    suggestions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Max 3 buttons." },
                     isUnclear: { type: Type.BOOLEAN }
                 },
                 required: ["answer", "suggestions", "isUnclear"]
-            },
-            thinkingConfig: { thinkingBudget: 4000 }
+            }
+            // Removed thinkingConfig to avoid RPC 500 errors in proxy environments
         },
     });
 
-    const text = response.text || "{}";
-    const data = JSON.parse(cleanJsonResponse(text)) as GeminiResponse;
+    const text = response.text;
+    if (!text) throw new Error("Intelligence Engine returned an empty response.");
+    
+    // With application/json, the output is directly a JSON string.
+    const data = JSON.parse(text) as GeminiResponse;
     return data;
   } catch (error: any) {
     console.error("Technical Intelligence Engine Failure:", error);
     return {
-        answer: "System Fault. Re-state query.",
+        answer: "The intelligence engine encountered a communication fault (RPC 500). Please check your network or ensure your API Key is correctly set in the Vercel dashboard.",
         suggestions: ["Matel System", "Virya Gen 2"],
         isUnclear: true
     };
@@ -94,7 +91,6 @@ LANGUAGE: Respond exclusively in ${languageName}.`;
 export async function generateSpeech(text: string, language: string): Promise<string> {
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const languageName = languageMap[language] || 'English';
         const cleanText = text.replace(/\[STEP \d+\]/g, 'Step').replace(/!\[.*?\]\(.*?\)/g, '').replace(/(https?:\/\/drive\.google\.com\/[^\s\n)]+)/g, '').replace(/\*\*/g, '').replace(/#/g, '').replace(/[-*]/g, ' ').trim();
         if (!cleanText) return '';
         const response = await ai.models.generateContent({
