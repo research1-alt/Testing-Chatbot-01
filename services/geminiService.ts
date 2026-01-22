@@ -36,7 +36,7 @@ export async function getChatbotResponse(
   
   if (!apiKey || apiKey === "") {
       return {
-          answer: "⚠️ SYSTEM CONFIGURATION ERROR: The 'API_KEY' is missing in Vercel environment variables. Please add it and redeploy.",
+          answer: "⚠️ SYSTEM CONFIGURATION ERROR: The 'API_KEY' is missing in Vercel environment variables.",
           suggestions: ["Setup Guide", "Contact Admin"],
           isUnclear: true
       };
@@ -44,18 +44,20 @@ export async function getChatbotResponse(
 
   try {
     const ai = new GoogleGenAI({ apiKey });
-    const languageName = languageMap[language] || 'English';
     
     const systemInstruction = `You are "OSM Buddy"—the official technical support AI for Omega Seiki Mobility.
 
-CRITICAL ACCURACY RULES:
-1. **NO HALLUCINATION**: Only use pin numbers and voltages explicitly mentioned in the KNOWLEDGE BASE. 
-2. **MATEL SPECIFICS**: For Matel MCU, the ignition (KSI) is 12V. Pins are 1 & 10. Do NOT mention "Pin 23" or "11-60V" for Matel ignition unless it is explicitly in the provided text.
-3. **VIRYA SPECIFICS**: Do not mix Virya Gen 2 pinouts with Matel. They are separate systems.
-4. **HEADER MATCHING**: Before answering, verify if the user is asking about "Matel" or "Virya". Look for that specific header in the manuals.
+STRICT GROUNDING RULES (MANDATORY):
+1. **NO EXTERNAL KNOWLEDGE**: You are forbidden from using information from your general training. You MUST ONLY use the provided [OSM MASTER DATABASE] and [SUPPLEMENTAL MANUALS].
+2. **TERM VERIFICATION**: If a term like "TrueDrive" or "Dynamic 6" is NOT in the provided context, you MUST NOT use it in your answer. 
+3. **SPECIFICATION LOCK**: 
+   - For Matel: Ignition is 12V (KSI) on Pins 1 & 10.
+   - For Virya Gen 2: Refer ONLY to the "Virya Gen 2 Pin Configuration" table.
+   - NEVER mention "Pin 23" or "11-60V" for Virya Gen 2 unless those exact digits are in the provided text for that controller.
+4. **UNKNOWN SYSTEMS**: If the user asks about a controller or system not described in the library, respond: "Technical specifications for [System Name] are not available in the current OSM library. Please upload the manual to the Admin Dashboard."
 5. **CONSISTENCY**: Use "[STEP X]" for troubleshooting and bold **text** for components.
 
-FORMAT: Output MUST be a valid JSON object. If a value is not in the knowledge base, say "Data not available in current library."`;
+Output MUST be a valid JSON object.`;
 
     const fullPrompt = `KNOWLEDGE BASE DATA:\n${context || "No context provided."}\n\nHISTORY:\n${chatHistory}\n\nUSER QUERY: "${query}"`;
   
