@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { ChatMessage as ChatMessageType } from '../types';
 import { generateSpeech } from '../services/geminiService';
 
@@ -86,10 +86,28 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
         });
     }
 
-    const parts = processedText.split(/(\[STEP \d+\]|Pro-Tip:|^\s*[•\-*]|\*\*.*?\*\*|\b\d+(?:\.\d+)?[V|v|A|a]\b|\bPin \d+[a-z]?\b|\b\d+ Ohm\b|\bErr-\d+\b)/gm);
+    const parts = processedText.split(/(SAFETY WARNING:|PRO-TIP:|\[STEP \d+\]|^\s*[•\-*]|\*\*.*?\*\*|\b\d+(?:\.\d+)?[V|v|A|a]\b|\bPin \d+[a-z]?\b|\b\d+ Ohm\b|\bErr-\d+\b)/gm);
     
     const contentNodes: React.ReactNode[] = parts.map((part, index) => {
         if (!part) return null;
+
+        if (part === "SAFETY WARNING:") {
+            return (
+                <div key={index} className="flex items-center gap-3 mt-4 mb-3 bg-red-50 border-2 border-red-200 p-4 rounded-2xl shadow-sm">
+                    <span className="text-2xl">⚠️</span>
+                    <span className="text-[11px] font-black text-red-700 uppercase tracking-widest leading-tight">MANDATORY SAFETY CHECK</span>
+                </div>
+            );
+        }
+
+        if (part === "PRO-TIP:") {
+            return (
+                <div key={index} className="flex items-center gap-2 mt-6 mb-3 bg-amber-50 border border-amber-200 p-3 rounded-2xl shadow-sm">
+                    <span className="text-xl">💡</span>
+                    <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Mentor's Pro-Tip</span>
+                </div>
+            );
+        }
 
         if (/^\[STEP \d+\]$/.test(part)) {
             const stepNumMatch = part.match(/\d+/);
@@ -106,15 +124,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
 
         if (/^\s*[•\-*]/.test(part) && part.length < 5) {
             return <span key={index} className="inline-flex items-center justify-center w-4 h-4 mr-2 text-sky-400 font-bold">•</span>;
-        }
-
-        if (part === "Pro-Tip:") {
-            return (
-                <div key={index} className="flex items-center gap-2 mt-8 mb-3 bg-amber-50 border border-amber-200 p-3 rounded-2xl shadow-sm">
-                    <span className="text-xl">💡</span>
-                    <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Field Pro-Tip</span>
-                </div>
-            );
         }
 
         if (part.startsWith('**') && part.endsWith('**')) {
@@ -161,11 +170,10 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
   };
 
   const formatMessage = (text: string) => {
-    // Detect very short technical answers (specifications)
     if (text.length < 25 && /\d+/.test(text) && !isUser) {
         return (
             <div className="flex flex-col items-center justify-center p-6 bg-slate-900 rounded-[2rem] border-4 border-slate-100 shadow-2xl">
-                <span className="text-[10px] font-black text-sky-400 uppercase tracking-[0.4em] mb-2">Technical Specification</span>
+                <span className="text-[10px] font-black text-sky-400 uppercase tracking-[0.4em] mb-2">Essential Data</span>
                 <span className="text-4xl font-black text-white tracking-tighter">{text}</span>
             </div>
         );
@@ -205,7 +213,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
   return (
     <div className={`flex flex-col gap-1 w-full ${isUser ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2 duration-300`}>
         <div className={`flex items-start gap-3 w-full ${isUser ? 'justify-end' : 'justify-start'}`}>
-            {!isUser && <div className="w-8 h-8 rounded-full bg-sky-900 flex items-center justify-center font-black text-[10px] text-white flex-shrink-0 shadow-lg border-2 border-white uppercase tracking-tighter">OSM</div>}
+            {!isUser && <div className="w-8 h-8 rounded-full bg-sky-900 flex items-center justify-center font-black text-[10px] text-white flex-shrink-0 shadow-lg border-2 border-white uppercase tracking-tighter">MENTOR</div>}
             
             <div className={`rounded-[1.5rem] p-5 max-w-[90%] sm:max-w-xl group relative shadow-xl transition-all border w-fit ${isUser ? 'bg-green-600 text-white border-green-500 rounded-br-none' : 'bg-white text-slate-800 border-slate-100 rounded-bl-none'}`}>
                 <div className="text-[14px] leading-[1.6]">

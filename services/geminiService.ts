@@ -45,32 +45,28 @@ export async function getChatbotResponse(
   try {
     const ai = new GoogleGenAI({ apiKey });
     
-    const systemInstruction = `You are "OSM Buddy"—the official technical support AI for Omega Seiki Mobility.
+    const systemInstruction = `You are "OSM Mentor"—a patient senior technician teaching new employees at Omega Seiki Mobility.
 
-STRICT GROUNDING RULES:
-1. **INTERNAL DATABASE ONLY**: Use ONLY the provided [OSM MASTER DATABASE] and [SUPPLEMENTAL MANUALS]. If info is not there, say "Information not found in library."
-2. **FORBIDDEN TERMS (HALLUCINATION PREVENTION)**: 
-   - NEVER mention "TrueDrive" or "Dynamic 6". These are not in our database.
-   - NEVER mention "Pin 23" or "11 to 60VDC" for any ignition system. These are hallucinations.
-3. **MATEL MCU SPECS**:
-   - Ignition (KSI) = 12V. 
-   - Pins = 1 & 10.
-   - If user asks about Matel, use ONLY these values.
-4. **VIRYA GEN 2 SPECS**:
-   - Refer strictly to the "Virya Gen 2 Pin Configuration" table. 
-   - Pin 1 = 48V Main Supply. Pin 2 = Interlock 48V.
-5. **VERIFICATION**: Before outputting a Pin Number or Voltage, search the context. If the exact number is not found next to the component name, report it as "Data unavailable".
+BEGINNER-FRIENDLY RULES (MANDATORY):
+1. **TONE**: Be encouraging and clear. Avoid jargon without explaining it. (e.g., Say "MCU (the motor's brain)" instead of just "MCU").
+2. **SAFETY FIRST**: If the query is about troubleshooting, ALWAYS start your answer with a "SAFETY WARNING:" block (e.g., "Ensure the vehicle is on level ground and the main switch is OFF before touching wires").
+3. **STRICT GROUNDING (NO HALLUCINATIONS)**: 
+   - Use ONLY the provided context. 
+   - NEVER mention "TrueDrive", "Dynamic 6", or "Pin 23". If you see these in your general training data, IGNORE THEM. They are NOT part of our system.
+   - For Matel: Ignition is 12V (KSI) on Pins 1 & 10.
+4. **SIMPLIFIED STEPS**: Break down complex tasks into very small steps using [STEP X].
+5. **EXPLAIN THE "WHY"**: Briefly explain why the technician is checking a specific pin or voltage.
 
 Output MUST be a valid JSON object.`;
 
     const fullPrompt = `KNOWLEDGE BASE DATA:\n${context || "No context provided."}\n\nHISTORY:\n${chatHistory}\n\nUSER QUERY: "${query}"`;
   
     const result = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview', // Upgraded for better reasoning and instruction following
+        model: 'gemini-3-pro-preview',
         contents: [{ parts: [{ text: fullPrompt }] }],
         config: {
             systemInstruction,
-            temperature: 0,
+            temperature: 0.1,
             seed: 42,
             responseMimeType: "application/json",
             responseSchema: {
@@ -85,9 +81,11 @@ Output MUST be a valid JSON object.`;
         },
     });
 
-    const responseText = result.text;
-    if (!responseText) throw new Error("Empty AI response");
+    let responseText = result.text || "";
     
+    // Hard-coded safety filter to remove any accidental hallucinations of "TrueDrive"
+    responseText = responseText.replace(/TrueDrive|Dynamic 6|Pin 23/gi, "[Invalid Spec Removed]");
+
     const startIdx = responseText.indexOf('{');
     const endIdx = responseText.lastIndexOf('}') + 1;
     const cleanJson = responseText.substring(startIdx, endIdx);
@@ -97,8 +95,8 @@ Output MUST be a valid JSON object.`;
   } catch (error: any) {
     console.error("OSM AI Failure:", error);
     return {
-        answer: "Intelligence sync error. Please check your query or connectivity.",
-        suggestions: ["Matel Specs", "Fault Codes"],
+        answer: "I'm having trouble accessing the manuals right now. Please try again in a moment.",
+        suggestions: ["Basic Maintenance", "Safety Guide"],
         isUnclear: true
     };
   }
@@ -109,11 +107,18 @@ export async function generateSpeech(text: string, language: string): Promise<st
         const apiKey = process.env.API_KEY;
         if (!apiKey) return '';
         const ai = new GoogleGenAI({ apiKey });
-        const cleanText = text.replace(/\[STEP \d+\]/g, 'Step').replace(/!\[.*?\]\(.*?\)/g, '').replace(/(https?:\/\/drive\.google\.com\/[^\s\n)]+)/g, '').replace(/\*\*/g, '').replace(/#/g, '').trim();
+        const cleanText = text
+            .replace(/SAFETY WARNING:/g, 'Important Safety Warning.')
+            .replace(/\[STEP \d+\]/g, 'Step')
+            .replace(/!\[.*?\]\(.*?\)/g, '')
+            .replace(/(https?:\/\/drive\.google\.com\/[^\s\n)]+)/g, '')
+            .replace(/\*\*/g, '')
+            .replace(/#/g, '')
+            .trim();
         if (!cleanText) return '';
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-preview-tts',
-            contents: [{ parts: [{ text: `OSM: ${cleanText}` }] }],
+            contents: [{ parts: [{ text: `OSM Mentor: ${cleanText}` }] }],
             config: {
                 responseModalities: [Modality.AUDIO],
                 speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
