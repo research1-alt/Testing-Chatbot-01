@@ -33,11 +33,12 @@ export async function getChatbotResponse(
     language: string,
 ): Promise<{ answer: string, suggestions: string[], isUnclear: boolean }> {
   const apiKey = process.env.API_KEY;
+  const targetLanguageName = languageMap[language] || 'English';
   
   if (!apiKey || apiKey === "") {
       return {
-          answer: "⚠️ SYSTEM CONFIGURATION ERROR: The 'API_KEY' is missing in Vercel environment variables.",
-          suggestions: ["Setup Guide", "Contact Admin"],
+          answer: "⚠️ SYSTEM CONFIGURATION ERROR: The 'API_KEY' is missing.",
+          suggestions: ["Contact Admin"],
           isUnclear: true
       };
   }
@@ -45,21 +46,30 @@ export async function getChatbotResponse(
   try {
     const ai = new GoogleGenAI({ apiKey });
     
-    const systemInstruction = `You are "OSM Mentor"—a patient senior technician teaching new employees at Omega Seiki Mobility.
+    // CRITICAL: We use a more aggressive system prompt to override the English bias of technical data.
+    const systemInstruction = `You are "OSM Mentor"—a senior technical expert. 
+CRITICAL RULE: You MUST translate the English manuals and respond ONLY in the NATIVE SCRIPT of ${targetLanguageName}.
+- If language is Hindi, use Devanagari script.
+- If language is Tamil, use Tamil script.
+- NEVER answer in English if ${targetLanguageName} is selected.
 
-BEGINNER-FRIENDLY RULES (MANDATORY):
-1. **TONE**: Be encouraging and clear. Avoid jargon without explaining it. (e.g., Say "MCU (the motor's brain)" instead of just "MCU").
-2. **SAFETY FIRST**: If the query is about troubleshooting, ALWAYS start your answer with a "SAFETY WARNING:" block (e.g., "Ensure the vehicle is on level ground and the main switch is OFF before touching wires").
-3. **STRICT GROUNDING (NO HALLUCINATIONS)**: 
-   - Use ONLY the provided context. 
-   - NEVER mention "TrueDrive", "Dynamic 6", or "Pin 23". If you see these in your general training data, IGNORE THEM. They are NOT part of our system.
-   - For Matel: Ignition is 12V (KSI) on Pins 1 & 10.
-4. **SIMPLIFIED STEPS**: Break down complex tasks into very small steps using [STEP X].
-5. **EXPLAIN THE "WHY"**: Briefly explain why the technician is checking a specific pin or voltage.
+RULES:
+1. **JSON ONLY**: Your entire output must be a single valid JSON object.
+2. **SCRIPTS**: The 'answer' and 'suggestions' MUST be in ${targetLanguageName} script.
+3. **TECHNICAL TERMS**: Keep IDs like "MCU", "Pin 1", "48V" in English script for clarity.
+4. **TONE**: Professional and helpful mentor. Start safety steps with "SAFETY WARNING:" in ${targetLanguageName}.
+5. **GROUNDING**: Use ONLY the provided context. Set isUnclear to true if information is missing.`;
 
-Output MUST be a valid JSON object.`;
+    const fullPrompt = `USER LANGUAGE: ${targetLanguageName}
+CONTEXT DATA:
+${context || "No context provided."}
 
-    const fullPrompt = `KNOWLEDGE BASE DATA:\n${context || "No context provided."}\n\nHISTORY:\n${chatHistory}\n\nUSER QUERY: "${query}"`;
+HISTORY:
+${chatHistory}
+
+USER QUERY: "${query}"
+
+REMINDER: Your JSON 'answer' and 'suggestions' MUST be in ${targetLanguageName} NATIVE SCRIPT.`;
   
     const result = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
@@ -81,11 +91,7 @@ Output MUST be a valid JSON object.`;
         },
     });
 
-    let responseText = result.text || "";
-    
-    // Hard-coded safety filter to remove any accidental hallucinations of "TrueDrive"
-    responseText = responseText.replace(/TrueDrive|Dynamic 6|Pin 23/gi, "[Invalid Spec Removed]");
-
+    const responseText = result.text || "";
     const startIdx = responseText.indexOf('{');
     const endIdx = responseText.lastIndexOf('}') + 1;
     const cleanJson = responseText.substring(startIdx, endIdx);
@@ -95,8 +101,8 @@ Output MUST be a valid JSON object.`;
   } catch (error: any) {
     console.error("OSM AI Failure:", error);
     return {
-        answer: "I'm having trouble accessing the manuals right now. Please try again in a moment.",
-        suggestions: ["Basic Maintenance", "Safety Guide"],
+        answer: "System error. Please try refreshing.",
+        suggestions: ["Retry"],
         isUnclear: true
     };
   }
@@ -107,25 +113,47 @@ export async function generateSpeech(text: string, language: string): Promise<st
         const apiKey = process.env.API_KEY;
         if (!apiKey) return '';
         const ai = new GoogleGenAI({ apiKey });
+        const targetLanguageName = languageMap[language] || 'English';
+
+        // Aggressive cleaning to prevent 500 errors caused by special characters or formatting
         const cleanText = text
-            .replace(/SAFETY WARNING:/g, 'Important Safety Warning.')
-            .replace(/\[STEP \d+\]/g, 'Step')
+            .replace(/SAFETY WARNING:/g, 'Warning.')
+            .replace(/PRO-TIP:/g, 'Tip.')
+            .replace(/\[STEP \d+\]/g, 'Step.')
             .replace(/!\[.*?\]\(.*?\)/g, '')
             .replace(/(https?:\/\/drive\.google\.com\/[^\s\n)]+)/g, '')
-            .replace(/\*\*/g, '')
-            .replace(/#/g, '')
+            .replace(/[*#_~`>]/g, '')
+            .replace(/\s+/g, ' ')
             .trim();
+
         if (!cleanText) return '';
+
+        // TO RESOLVE 500 ERROR:
+        // 1. Move instructions into the prompt instead of systemInstruction for TTS model.
+        // 2. Do not use thinkingConfig or other complex configs.
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-preview-tts',
-            contents: [{ parts: [{ text: `OSM Mentor: ${cleanText}` }] }],
+            contents: [{ 
+                parts: [{ 
+                    text: `Speak this in ${targetLanguageName} like a helpful mentor: ${cleanText}` 
+                }] 
+            }],
             config: {
                 responseModalities: [Modality.AUDIO],
-                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
+                speechConfig: { 
+                    voiceConfig: { 
+                        prebuiltVoiceConfig: { 
+                            voiceName: 'Kore' 
+                        } 
+                    } 
+                },
             },
         });
-        return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || '';
+        
+        const audioData = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+        return audioData || '';
     } catch (error) {
+        console.error("Detailed TTS Error:", error);
         return '';
     }
 }

@@ -36,9 +36,11 @@ function decodeBase64(base64: string) {
 }
 
 async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer);
+  // raw PCM data from Gemini is 16-bit little-endian
+  const dataInt16 = new Int16Array(data.buffer, data.byteOffset, data.byteLength / 2);
   const frameCount = dataInt16.length / numChannels;
   const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+  
   for (let channel = 0; channel < numChannels; channel++) {
     const channelData = buffer.getChannelData(channel);
     for (let i = 0; i < frameCount; i++) {
@@ -60,6 +62,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
   
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const audioCacheRef = useRef<AudioBuffer | null>(null);
 
   const processContent = (text: string) => {
     const mdRegex = /(!\[.*?\]\(.*?\))/g;
@@ -181,29 +184,53 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, language, onSendMess
     return processContent(text);
   };
 
+  const playBuffer = (buffer: AudioBuffer) => {
+    if (!audioContextRef.current) return;
+    const source = audioContextRef.current.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioContextRef.current.destination);
+    source.onended = () => setIsSpeaking(false);
+    source.start(0);
+    sourceRef.current = source;
+    setIsSpeaking(true);
+  };
+
   const handlePlayAudio = async () => {
     if (isSpeaking) {
-      if (sourceRef.current) { try { sourceRef.current.stop(); } catch(e) {} }
+      if (sourceRef.current) { 
+        try { sourceRef.current.stop(); } catch(e) {} 
+      }
       setIsSpeaking(false);
       return;
     }
+
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+    }
+    
+    // Resume audio context inside a user gesture
+    await audioContextRef.current.resume();
+
+    if (audioCacheRef.current) {
+      playBuffer(audioCacheRef.current);
+      return;
+    }
+
     setIsAudioLoading(true);
     try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      }
       const base64Audio = await generateSpeech(message.text, language);
-      if (!base64Audio) { setIsAudioLoading(false); return; }
+      if (!base64Audio) {
+        setIsAudioLoading(false);
+        return;
+      }
+      
       const audioBytes = decodeBase64(base64Audio);
       const buffer = await decodeAudioData(audioBytes, audioContextRef.current, 24000, 1);
-      const source = audioContextRef.current.createBufferSource();
-      source.buffer = buffer;
-      source.connect(audioContextRef.current.destination);
-      source.onended = () => setIsSpeaking(false);
-      source.start();
-      sourceRef.current = source;
-      setIsSpeaking(true);
+      
+      audioCacheRef.current = buffer;
+      playBuffer(buffer);
     } catch (err) {
+      console.error("Audio playback error:", err);
       setIsSpeaking(false);
     } finally {
       setIsAudioLoading(false);
