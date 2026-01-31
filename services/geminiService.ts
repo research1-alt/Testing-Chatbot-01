@@ -43,69 +43,53 @@ export async function getChatbotResponse(
   try {
     const ai = new GoogleGenAI({ apiKey });
     
-    const systemInstruction = `CRITICAL OPERATIONAL PROTOCOL FOR "OSM MENTOR":
-1. YOU ARE A PRECISION TECHNICAL RETRIEVAL ENGINE for Omega Seiki Mobility (OSM).
-2. CORE OBJECTIVE: Provide exactly what the user asks for without mixing in unrelated information from other manual modules.
+    const systemInstruction = `CRITICAL: YOUR ENTIRE RESPONSE MUST BE IN THE ${targetLanguageName.toUpperCase()} LANGUAGE. 
+DO NOT USE ENGLISH EXCEPT FOR TECHNICAL KEYWORDS LIKE "MCU", "Pin", "Relay", "KSI", "V", "A", "CAN", "PCAN".
 
-3. DATA RETRIEVAL LOGIC (STRICT):
-   - IF THE QUERY CONTAINS A BRAND (Exponent, Exicom, Clean, Matel, Virya) OR COMPONENT (Battery, MCU, Motor, Relay):
-     - SEARCH the "GLOBAL HARDWARE & BATTERY SPECIFICATIONS" section first.
-     - EXTRACT the SPECIFIC technical block for that brand/item.
-     - OUTPUT ONLY THAT DATA VERBATIM in Markdown format.
-     - DO NOT add "Troubleshooting tips", "Startup Sequences", or "General Architecture" from other modules unless specifically requested.
-     - Example: If asked "exponent battery specs", return ONLY the Exponent Battery Specification table/list. No other talk.
+You are "OSM Mentor"—a high-precision technical intelligence for Omega Seiki Mobility service technicians.
 
-4. DIAGNOSTIC LOGIC:
-   - Only provide step-by-step [STEP 1], [STEP 2] procedures if the query is an "Err-XX" code or a "How to fix" question.
+YOU HAVE ACCESS TO MULTIPLE TECHNICAL MODULES:
+1. **POWER TRAIN SPECIFICS**: Matel (12V), Virya Gen 1 Old (48V), Virya Gen 1 AIS 156 (12V Aux), Virya Gen 2 (Advanced).
+2. **MASTER ERROR DIAGNOSTICS**: Detailed Err-01 to Err-60 definitions and troubleshooting steps.
+3. **HARDWARE & BATTERY SPECS**: Detailed info on Exicom, Exponent, and Clean batteries, CAN termination, and Sloki/Virya clusters.
+4. **TOOLS**: Step-by-step PCAN Tool process.
 
-5. LANGUAGE: 
-   - RESPOND ENTIRELY IN ${targetLanguageName.toUpperCase()}.
-   - Retain technical units (V, Ah, KWH, KG) and Pin numbers in English as they are standard on labels.
+STRICT OPERATIONAL RULES:
+1. **INITIAL SELECTION CONFIRMATION**: If the user selects a Power Train system from the initial list, ONLY confirm that you have selected that module and are ready to help. DO NOT provide technical info yet.
+2. **STEP-BY-STEP FORMATTING**: For all troubleshooting or technical instructions, use the [STEP 1], [STEP 2] format.
+3. **TECHNICAL ACCURACY**: Use the specific battery and hardware specs (e.g., Exicom vs Exponent) when the user mentions a battery make. Use the Master Error list for any "Err-X" queries.
+4. **LANGUAGE**: Respond ONLY in ${targetLanguageName}. Even the 'answer' field in JSON must be translated.
 
-6. IF DATA IS MISSING: 
-   - If you cannot find the specific brand or part in ANY module after a thorough scan, state clearly: "Information not found in technical repository." 
-   - NEVER hallucinate or substitute with general vehicle architecture data.
+JSON OUTPUT: Return valid JSON with 'answer', 'suggestions', and 'isUnclear'.`;
 
-7. TONE: Cold, technical, and precise. No conversational filler like "Here are the specs you requested" or "I am happy to help".`;
+    const fullPrompt = `LANGUAGE TO USE: ${targetLanguageName}
+    
+KNOWLEDGE BASE:
+${context || "No context provided."}
 
-    const fullPrompt = `USER LANGUAGE: ${targetLanguageName}
-
-[TECHNICAL REPOSITORY]
-${context || "No technical modules provided."}
-
-### CONVERSATION LOG
+HISTORY:
 ${chatHistory}
 
-### TECHNICIAN QUERY
-"${query}"
+USER QUERY: "${query}"
 
-### MANDATORY OUTPUT REQUIREMENTS:
-- Is this a request for SPECIFICATIONS (e.g. "Exponent Details", "Battery Specs")?
-- If YES: PROVIDE ONLY THE VERBATIM DATA from the Hardware module. DO NOT add general vehicle architecture or troubleshooting steps.
-- ANSWER IN ${targetLanguageName.toUpperCase()}.`;
+REMINDER: 
+- Respond ONLY in ${targetLanguageName}.
+- Use [STEP X] for instructions.
+- If just a system selection, confirm and wait.`;
   
     const result = await ai.models.generateContent({
         model: 'gemini-3-flash-preview', 
         contents: [{ parts: [{ text: fullPrompt }] }],
         config: {
             systemInstruction,
-            temperature: 0.0, 
-            topP: 0.1,
-            topK: 1,
+            temperature: 0.1,
             seed: 42,
             responseMimeType: "application/json",
             responseSchema: {
                 type: Type.OBJECT,
                 properties: {
-                    answer: { 
-                        type: Type.STRING, 
-                        description: `Precise technical response. Verbatim for specs. [STEP X] for diagnostic processes. Language: ${targetLanguageName.toUpperCase()}.` 
-                    },
-                    suggestions: { 
-                        type: Type.ARRAY, 
-                        items: { type: Type.STRING },
-                        description: `Relevant follow-up questions in ${targetLanguageName}.`
-                    },
+                    answer: { type: Type.STRING },
+                    suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
                     isUnclear: { type: Type.BOOLEAN }
                 },
                 required: ["answer", "suggestions", "isUnclear"]
@@ -116,15 +100,15 @@ ${chatHistory}
     const responseText = result.text || "";
     const startIdx = responseText.indexOf('{');
     const endIdx = responseText.lastIndexOf('}') + 1;
-    if (startIdx === -1) throw new Error("AI returned invalid JSON structure");
+    if (startIdx === -1) throw new Error("Invalid response format");
     const cleanJson = responseText.substring(startIdx, endIdx);
     
     return JSON.parse(cleanJson) as GeminiResponse;
 
   } catch (error: any) {
-    console.error("OSM AI ERROR:", error);
+    console.error("OSM AI Failure:", error);
     return {
-        answer: "Sync failure. Please check your data connection and retry.",
+        answer: "Processing error. Please try again.",
         suggestions: ["Retry"],
         isUnclear: true
     };
@@ -151,7 +135,7 @@ export async function generateSpeech(text: string, language: string): Promise<st
 
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-preview-tts',
-            contents: [{ parts: [{ text: `Read: ${cleanText}` }] }],
+            contents: [{ parts: [{ text: `Speak in ${targetLanguageName}: ${cleanText}` }] }],
             config: {
                 responseModalities: [Modality.AUDIO],
                 speechConfig: { 

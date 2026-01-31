@@ -140,7 +140,7 @@ const App: React.FC = () => {
       setKbFiles(storedFiles);
       
       const combined = storedFiles
-        .map(f => `### MODULE: ${f.name} ###\n${f.content}\n### END MODULE ###`)
+        .map(f => `--- KNOWLEDGE BASE MODULE: ${f.name} ---\n${f.content}\n--- END MODULE ---`)
         .join('\n\n');
       setKbContent(combined);
     } catch (err) {
@@ -157,6 +157,7 @@ const App: React.FC = () => {
     }
   }, [view, loadKnowledgeBase, fetchMasterSheet]);
 
+  // Handle fresh chat or language change (optional re-init)
   useEffect(() => {
     if (view === 'chat' && !isRefreshing) {
         setMessages([getInitialMessage()]);
@@ -182,24 +183,7 @@ const App: React.FC = () => {
         .map(m => `${m.sender === 'bot' ? 'OSM Mentor' : 'Technician'}: ${m.text}`)
         .join('\n');
 
-      // Targeted lookup for the specific BATTERY SPECIFICATION module
-      const hwFile = kbFiles.find(f => 
-        f.name.toUpperCase().includes('BATTERY') && 
-        f.name.toUpperCase().includes('SPECIFICATION')
-      );
-      
-      const hwContent = hwFile ? hwFile.content : '';
-
-      const fullContext = `
-[GLOBAL HARDWARE & BATTERY SPECIFICATIONS - MASTER DATA]
-${hwContent}
-
-[TROUBLESHOOTING & PROCEDURAL MANUALS]
-${kbContent || ''}
-
-[SYSTEM FEED]
-${masterSheetContent || ''}
-      `;
+      const fullContext = `[OSM CENTRAL DATABASE]\n${masterSheetContent}\n\n[TECHNICAL KNOWLEDGE BASE]\n${kbContent}`;
       
       const response = await getChatbotResponse(text, fullContext, history, language);
       
