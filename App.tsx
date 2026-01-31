@@ -182,23 +182,23 @@ const App: React.FC = () => {
         .map(m => `${m.sender === 'bot' ? 'OSM Mentor' : 'Technician'}: ${m.text}`)
         .join('\n');
 
-      // Enhanced HW spec search to ensure the specific technical sheet is identified
+      // Targeted lookup for the specific BATTERY SPECIFICATION module
       const hwFile = kbFiles.find(f => 
         f.name.toUpperCase().includes('BATTERY') && 
-        f.name.toUpperCase().includes('SPECIFICATIONS')
+        f.name.toUpperCase().includes('SPECIFICATION')
       );
       
-      const hwContent = hwFile ? hwFile.content : 'WARNING: Technical Data Module is missing or still loading.';
+      const hwContent = hwFile ? hwFile.content : '';
 
       const fullContext = `
 [GLOBAL HARDWARE & BATTERY SPECIFICATIONS - MASTER DATA]
 ${hwContent}
 
-[POWER TRAIN & TROUBLESHOOTING MANUALS]
-${kbContent || 'Technical modules loading...'}
+[TROUBLESHOOTING & PROCEDURAL MANUALS]
+${kbContent || ''}
 
-[REAL-TIME ACTIVITY FEED]
-${masterSheetContent || 'No cloud activity logs available.'}
+[SYSTEM FEED]
+${masterSheetContent || ''}
       `;
       
       const response = await getChatbotResponse(text, fullContext, history, language);
@@ -356,7 +356,7 @@ ${masterSheetContent || 'No cloud activity logs available.'}
           </div>
           <div className="flex items-center gap-2">
             <button onClick={handleReloadApp} className="p-2.5 bg-sky-50 hover:bg-sky-100 border border-sky-100 rounded-full text-sky-600 transition-all shadow-sm group active:scale-90" title="Refresh Application">
-              <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357-2H15" /></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
             </button>
             <div className="flex items-center gap-3 pl-3 border-l border-sky-100">
                 <div className="w-10 h-10 rounded-2xl bg-sky-900 flex items-center justify-center font-black text-sm text-white shadow-xl border-2 border-white">
