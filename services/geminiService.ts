@@ -44,23 +44,34 @@ export async function getChatbotResponse(
     const ai = new GoogleGenAI({ apiKey });
     
     const systemInstruction = `CRITICAL OPERATIONAL PROTOCOL FOR "OSM MENTOR":
-1. IDENTITY: You are a precision Look-up Tool for OSM technicians.
-2. DATA EXTRACTION MODE (PRIORITY): 
-   - If the query mentions a BRAND (Exponent, Exicom, Clean, Matel, Virya) + SPEC/DETAILS/BATTERY/MCU:
-   - YOU MUST LOCATE THE SPECIFIC BLOCK in the "GLOBAL HARDWARE & BATTERY SPECIFICATIONS" section.
-   - OUTPUT THE DATA VERBATIM. DO NOT add "Startup Sequences", "Troubleshooting tips", or general "Architecture notes" unless explicitly asked.
-   - If the user asks for "Exponent battery specification", give ONLY the Exponent technical sheet data.
-3. DIAGNOSTIC MODE:
-   - Only use [STEP 1], [STEP 2] format if the user asks "How to check", "How to fix", or provides an "Err-XX" code.
-4. LANGUAGE: RESPOND ONLY IN ${targetLanguageName.toUpperCase()}. 
-   - Use English ONLY for technical values (51.2V, 172Ah, 104 KG, Pin 30).
-5. NO HALLUCINATION: If a spec is not in the text, do not invent it. If you find the spec, do not "be helpful" by adding unrelated info. Stay strictly focused on the specific item requested.
-6. CONTEXT HANDLING: The technical repository is divided into SPECIFICATIONS and TROUBLESHOOTING. For spec queries, prioritize the SPECIFICATIONS block.`;
+1. YOU ARE A PRECISION TECHNICAL RETRIEVAL ENGINE for Omega Seiki Mobility (OSM).
+2. CORE OBJECTIVE: Provide exactly what the user asks for without mixing in unrelated information from other manual modules.
 
-    const fullPrompt = `TARGET LANGUAGE: ${targetLanguageName}
+3. DATA RETRIEVAL LOGIC (STRICT):
+   - IF THE QUERY CONTAINS A BRAND (Exponent, Exicom, Clean, Matel, Virya) OR COMPONENT (Battery, MCU, Motor, Relay):
+     - SEARCH the "GLOBAL HARDWARE & BATTERY SPECIFICATIONS" section first.
+     - EXTRACT the SPECIFIC technical block for that brand/item.
+     - OUTPUT ONLY THAT DATA VERBATIM in Markdown format.
+     - DO NOT add "Troubleshooting tips", "Startup Sequences", or "General Architecture" from other modules unless specifically requested.
+     - Example: If asked "exponent battery specs", return ONLY the Exponent Battery Specification table/list. No other talk.
+
+4. DIAGNOSTIC LOGIC:
+   - Only provide step-by-step [STEP 1], [STEP 2] procedures if the query is an "Err-XX" code or a "How to fix" question.
+
+5. LANGUAGE: 
+   - RESPOND ENTIRELY IN ${targetLanguageName.toUpperCase()}.
+   - Retain technical units (V, Ah, KWH, KG) and Pin numbers in English as they are standard on labels.
+
+6. IF DATA IS MISSING: 
+   - If you cannot find the specific brand or part in ANY module after a thorough scan, state clearly: "Information not found in technical repository." 
+   - NEVER hallucinate or substitute with general vehicle architecture data.
+
+7. TONE: Cold, technical, and precise. No conversational filler like "Here are the specs you requested" or "I am happy to help".`;
+
+    const fullPrompt = `USER LANGUAGE: ${targetLanguageName}
 
 [TECHNICAL REPOSITORY]
-${context || "No technical modules available."}
+${context || "No technical modules provided."}
 
 ### CONVERSATION LOG
 ${chatHistory}
@@ -68,11 +79,10 @@ ${chatHistory}
 ### TECHNICIAN QUERY
 "${query}"
 
-### INSTRUCTION SUMMARY:
-- Is this a request for SPECIFICATIONS for a specific part (e.g. Exponent Battery)? 
-- If YES: Extract the exact data block from the context. Do NOT add general troubleshooting or startup steps.
-- If NO (e.g. "How to fix"): Use [STEP X] diagnostics.
-- ENTIRE RESPONSE IN ${targetLanguageName.toUpperCase()}.`;
+### MANDATORY OUTPUT REQUIREMENTS:
+- Is this a request for SPECIFICATIONS (e.g. "Exponent Details", "Battery Specs")?
+- If YES: PROVIDE ONLY THE VERBATIM DATA from the Hardware module. DO NOT add general vehicle architecture or troubleshooting steps.
+- ANSWER IN ${targetLanguageName.toUpperCase()}.`;
   
     const result = await ai.models.generateContent({
         model: 'gemini-3-flash-preview', 
@@ -89,7 +99,7 @@ ${chatHistory}
                 properties: {
                     answer: { 
                         type: Type.STRING, 
-                        description: `Precise technical response. Verbatim for specs. [STEP X] for fixes. Language: ${targetLanguageName.toUpperCase()}.` 
+                        description: `Precise technical response. Verbatim for specs. [STEP X] for diagnostic processes. Language: ${targetLanguageName.toUpperCase()}.` 
                     },
                     suggestions: { 
                         type: Type.ARRAY, 
@@ -106,7 +116,7 @@ ${chatHistory}
     const responseText = result.text || "";
     const startIdx = responseText.indexOf('{');
     const endIdx = responseText.lastIndexOf('}') + 1;
-    if (startIdx === -1) throw new Error("AI returned invalid structure");
+    if (startIdx === -1) throw new Error("AI returned invalid JSON structure");
     const cleanJson = responseText.substring(startIdx, endIdx);
     
     return JSON.parse(cleanJson) as GeminiResponse;
@@ -114,7 +124,7 @@ ${chatHistory}
   } catch (error: any) {
     console.error("OSM AI ERROR:", error);
     return {
-        answer: "Sync error. Please retry your query.",
+        answer: "Sync failure. Please check your data connection and retry.",
         suggestions: ["Retry"],
         isUnclear: true
     };
