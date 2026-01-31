@@ -182,18 +182,23 @@ const App: React.FC = () => {
         .map(m => `${m.sender === 'bot' ? 'OSM Mentor' : 'Technician'}: ${m.text}`)
         .join('\n');
 
-      const hwFile = kbFiles.find(f => f.name.toUpperCase().includes('HARDWARE') || f.name.toUpperCase().includes('SPECIFICATIONS'));
-      const hwContent = hwFile ? hwFile.content : '';
+      // Enhanced HW spec search to ensure the specific technical sheet is identified
+      const hwFile = kbFiles.find(f => 
+        f.name.toUpperCase().includes('BATTERY') && 
+        f.name.toUpperCase().includes('SPECIFICATIONS')
+      );
+      
+      const hwContent = hwFile ? hwFile.content : 'WARNING: Technical Data Module is missing or still loading.';
 
       const fullContext = `
-[GLOBAL HARDWARE & BATTERY SPECIFICATIONS]
+[GLOBAL HARDWARE & BATTERY SPECIFICATIONS - MASTER DATA]
 ${hwContent}
 
-[TROUBLESHOOTING MANUALS]
-${kbContent || ''}
+[POWER TRAIN & TROUBLESHOOTING MANUALS]
+${kbContent || 'Technical modules loading...'}
 
-[ACTIVITY FEED]
-${masterSheetContent || ''}
+[REAL-TIME ACTIVITY FEED]
+${masterSheetContent || 'No cloud activity logs available.'}
       `;
       
       const response = await getChatbotResponse(text, fullContext, history, language);
