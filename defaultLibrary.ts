@@ -2,6 +2,54 @@
 import { StoredFile } from './utils/db';
 
 /**
+ * MODULE: BATTERY SPECIFICATION DETAILS (HIGH PRIORITY)
+ */
+const batterySpecificationDetails = `
+# MODULE: BATTERY SPECIFICATION DETAILS
+
+## 1. Battery Make & Specifications
+
+### Exicom Battery Specification
+- Make & Trade Name - Exicom Energy Systems Pvt. Ltd.
+- Model No - 2040506
+- Weight - 90 KG
+- Cell Configuration in Pack - 16S 2P
+- Module Configuration in Pack - NA
+- Capacity: 10.75 KWH / 210 Ah
+- Operating Range: 46 V to 58.4 V
+- KSI Voltage: 52V
+- Nominal Voltage: 51.2V
+- BMS Make - Exicom
+
+### Exponent Battery Specification
+- Make & Trade Name - Exponent Energy E- Pack
+- Model No - E-Pack 5188 - TG1
+- Weight - 104 KG
+- Cell Configuration in Pack - Module to Pack
+- Module Configuration in Pack - 8s Module, 2 Module in Series, 2 Modules in parallel
+- Capacity: 8.8 KWH / 172ah
+- Operating Range: 47.2V - 58V
+- KSI Voltage: 5V (Drops to 2.5V-3V when KSI connected)
+- Nominal Voltage: 51.2V
+- BMS Make - Exponent Energy
+
+### Clean Battery Specification
+- Make & Trade Name - RTCXFC Industries Pvt Ltd 
+- Model No - FLO 150 
+- Weight - 120 KG
+- Cell Configuration in Pack - 15S 1P 
+- Module Configuration in Pack - NA
+- Capacity: 15.1 KWH / 314Ah
+- Operating Range: 43.5V to 54.75V
+- Nominal Voltage: 48V 
+- BMS Make - RTCXFC Industries Pvt Ltd 
+
+## ADDITIONAL SYSTEM HARDWARE LOGIC
+- CAN Termination: 120 Ohm in Cluster/MCU. 60 Ohm Parallel.
+- Cluster Comparison: Sloki (Delay sensing) vs Virya (Basic).
+`;
+
+/**
  * MODULE 1: MATEL POWER TRAIN (12V SYSTEM)
  */
 const matelContent = `
@@ -15,11 +63,6 @@ const matelContent = `
 1. Check MCU Ignition (12V).
 2. Check MCU Fuse Box (FMCU).
 3. Check BFGNR Switch (12V input from Ignition Switch Pin 2).
-
-## Hardware Details
-- MCU KSI: 12V.
-- Throttle/Encoder: 5V.
-- Operating Voltage: 42V to 60V.
 `;
 
 /**
@@ -31,11 +74,6 @@ const viryaGen1OldContent = `
 - Step 1: Main 48V Battery turns ON.
 - Step 2: DC-output Relay On.
 - MCU Wake-up: Receives 48V from Terminal Box via MCU Relay.
-
-## Troubleshooting
-1. Main battery status.
-2. MCU Relay output (48V at Pin 87a).
-3. BFNR Input ground signal.
 `;
 
 /**
@@ -61,11 +99,6 @@ const viryaGen2Content = `
 ## Power Flow
 - Aux Battery -> FAB -> Emergency Switch -> Ignition Switch.
 - MCU Wake-up: 48V from Terminal Box at MCU pins 1 & 2.
-
-## Technical Info
-- MCU KSI: 48V.
-- BFGNR: Ground based.
-- Throttle: 5V.
 `;
 
 /**
@@ -87,53 +120,11 @@ const masterErrorContent = `
 [STEP 2] Check context below for specific brand troubleshooting.
 `;
 
-/**
- * MODULE 6: CENTRAL HARDWARE SPECIFICATION DATA (HIGH PRIORITY)
- */
-const batterySpecificationDetails = `
-# MODULE: GLOBAL HARDWARE & BATTERY SPECIFICATIONS
-[PRIORITY TECHNICAL DATA SHEETS]
-
-## BRAND: EXCOM
-- Make & Trade Name: Exicom Energy Systems Pvt. Ltd.
-- Model: 2040506
-- Weight: 90 KG
-- Configuration: 16S 2P
-- Capacity: 10.75 KWH / 210 Ah
-- Operating Range: 46V - 58.4V
-- Nominal Voltage: 51.2V
-
-## BRAND: EXPONENT
-- Make & Trade Name: Exponent Energy E-Pack
-- Model: E-Pack 5188 - TG1
-- Weight: 104 KG
-- Module Config: 8s Module, 2 Series, 2 Parallel
-- Capacity: 8.8 KWH / 172ah
-- Operating Range: 47.2V - 58V
-- KSI Voltage: 5V (Drops to 2.5V-3V on connection)
-- Nominal Voltage: 51.2V
-- BMS Make: Exponent Energy
-
-## BRAND: CLEAN
-- Make & Trade Name: RTCXFC Industries Pvt Ltd
-- Model: FLO 150
-- Weight: 120 KG
-- Configuration: 15S 1P
-- Capacity: 15.1 KWH / 314Ah
-- Operating Range: 43.5V - 54.75V
-- Nominal Voltage: 48V
-- BMS Make: RTCXFC Industries
-
-## SYSTEM HARDWARE LOGIC
-- CAN Termination: 120 Ohm in Cluster/MCU. 60 Ohm Parallel.
-- Cluster Comparison: Sloki (Delay sensing) vs Virya (Basic).
-`;
-
 export const ALL_DEFAULT_LIBRARIES: StoredFile[] = [
+  { name: 'BATTERY-SPECIFICATION-DETAILS.md', content: batterySpecificationDetails, size: 0, lastModified: Date.now() },
   { name: 'Module-Matel-12V.md', content: matelContent, size: 0, lastModified: Date.now() },
   { name: 'Module-Virya-Gen1-Old.md', content: viryaGen1OldContent, size: 0, lastModified: Date.now() },
   { name: 'Module-Virya-Gen1-AIS156.md', content: viryaGen1NewContent, size: 0, lastModified: Date.now() },
   { name: 'Module-Virya-Gen2.md', content: viryaGen2Content, size: 0, lastModified: Date.now() },
-  { name: 'Module-Master-Error-Diagnostics.md', content: masterErrorContent, size: 0, lastModified: Date.now() },
-  { name: 'BATTERY-&-SYSTEM-HARDWARE-SPECIFICATIONS.md', content: batterySpecificationDetails, size: 0, lastModified: Date.now() }
+  { name: 'Module-Master-Error-Diagnostics.md', content: masterErrorContent, size: 0, lastModified: Date.now() }
 ];
